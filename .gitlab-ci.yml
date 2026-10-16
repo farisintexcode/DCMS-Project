@@ -1,0 +1,92 @@
+# GitHub is canonical. Configure this as a protected, read-only pull mirror before enabling CI.
+workflow:
+  rules:
+    - if: '$CI_COMMIT_REF_PROTECTED == "true"'
+    - when: never
+
+stages: [source, assets, test]
+
+reviewed_source:
+  stage: source
+  image:
+    name: alpine/git:2.49.1
+    entrypoint: ['']
+  script:
+    - test -n "$GITHUB_CANONICAL_REPOSITORY"
+    - test "$(git ls-remote "$GITHUB_CANONICAL_REPOSITORY" refs/heads/main | cut -f1)" = "$CI_COMMIT_SHA"
+
+assets:
+  stage: assets
+  image: node:24-bookworm
+  script:
+    - npm ci --ignore-scripts
+    - npm audit --audit-level=high
+    - npm run build
+    # Pass the official image's Node runtime to the PHP/browser job.
+    - mkdir -p .ci-runtime
+    - cp /usr/local/bin/node .ci-runtime/node
+  artifacts:
+    paths: [public/build, node_modules, .ci-runtime/node]
+    expire_in: 1 day
+
+foundation:
+  stage: test
+  image: php:8.4-cli-bookworm
+  services:
+    - name: postgres:17-alpine
+      alias: pgsql
+    - name: redis:7.4-alpine
+      alias: redis
+  variables:
+    APP_ENV: testing
+    APP_DEBUG: 'false'
+    DB_CONNECTION: pgsql
+    DB_HOST: pgsql
+    DB_PORT: '5432'
+    DB_DATABASE: testing
+    DB_USERNAME: dcms_ci
+    DB_PASSWORD: ci-isolated-database
+    POSTGRES_DB: testing
+    POSTGRES_USER: dcms_ci
+    POSTGRES_PASSWORD: ci-isolated-database
+    REDIS_HOST: redis
+    REDIS_CLIENT: predis
+    SESSION_DRIVER: redis
+    CACHE_STORE: redis
+    QUEUE_CONNECTION: redis
+    PULSE_ENABLED: 'false'
+    SENTRY_LARAVEL_DSN: ''
+    MAIL_MAILER: array
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq git unzip curl libpq-dev libzip-dev libonig-dev libxml2-dev libicu-dev
+    - docker-php-ext-install pdo_pgsql mbstring bcmath intl zip > /dev/null
+    - curl -fsSLo composer-setup.php https://getcomposer.org/installer
+    - test "$(sha384sum composer-setup.php | cut -d' ' -f1)" = "$(curl -fsSL https://composer.github.io/installer.sig)"
+    - php composer-setup.php --install-dir=/usr/local/bin --filename=composer --quiet
+    - rm composer-setup.php
+    - composer install --prefer-dist --no-interaction
+    - cp .env.example .env
+    - php artisan key:generate --no-interaction
+    - export DCMS_SEARCH_KEY="$(php -r 'echo base64_encode(random_bytes(32));')"
+  script:
+    - composer validate --strict
+    - composer audit
+    - php vendor/bin/pint --test
+    - php vendor/bin/pest --compact
+    - php artisan config:cache && php artisan config:clear
+    - php artisan view:cache
+    - export PATH="$CI_PROJECT_DIR/.ci-runtime:$PATH"
+    - node node_modules/playwright/cli.js install --with-deps chromium
+    - export DB_DATABASE=dcms_e2e
+    - php -r '$db=new PDO("pgsql:host=pgsql;dbname=testing",getenv("DB_USERNAME"),getenv("DB_PASSWORD")); $db->exec("CREATE DATABASE dcms_e2e");'
+    - export DCMS_E2E_PASSWORD="$(php -r 'echo bin2hex(random_bytes(24));')!aA1"
+    - export DCMS_E2E_ADMIN_EMAIL=admin@example.test DCMS_E2E_RIDER_EMAIL=rider@example.test
+    - php artisan migrate --seed --no-interaction
+    - php artisan db:seed --class=BrowserTestSeeder --no-interaction
+    - php artisan serve --host=127.0.0.1 --port=8000 --no-reload > /tmp/dcms-server.log 2>&1 &
+    - for attempt in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/up && break; sleep 1; done
+    - node node_modules/playwright/cli.js test
+  artifacts:
+    when: on_failure
+    paths: [test-results]
+    expire_in: 1 day

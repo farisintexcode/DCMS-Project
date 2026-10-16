@@ -1,0 +1,4 @@
+<section class="grid gap-7">
+    <div><p class="mb-2 text-xs font-semibold tracking-widest text-teal-700 uppercase">DCMS workspace</p><h1 class="text-3xl font-semibold tracking-tight">Welcome, {{ auth()->user()->name }}</h1><p class="mt-3 max-w-2xl text-sm leading-6 text-slate-600">Your Admin workspace is ready. Open Customers to manage records within your permitted client portfolio.</p></div>
+    <div class="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8"><span class="rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-800">Foundation</span><h2 class="mt-5 text-xl font-semibold">A structured start for DCMS</h2><p class="mt-3 max-w-2xl text-sm leading-6 text-slate-600">Identity, permissions and the application shell are established. Operational dashboard metrics will become available with their source modules.</p><p class="mt-5 text-xs text-slate-500">Business timezone: {{ config('dcms.business_timezone') }}</p></div>
+</section>

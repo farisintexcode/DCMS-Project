@@ -1,0 +1,62 @@
+<?php
+
+namespace App\Models;
+
+use App\Enums\AccountStatus;
+use App\Models\Concerns\HasPublicId;
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+use Spatie\Permission\Traits\HasRoles;
+
+/** Database.md users; Module.md M01. Privileged fields are set only by trusted actions. */
+class User extends Authenticatable
+{
+    use HasFactory, HasPublicId, HasRoles, Notifiable;
+
+    protected $fillable = ['name', 'email', 'password'];
+
+    protected $hidden = ['password', 'remember_token'];
+
+    protected function casts(): array
+    {
+        return ['status' => AccountStatus::class, 'email_verified_at' => 'immutable_datetime', 'last_login_at' => 'immutable_datetime', 'password' => 'hashed'];
+    }
+
+    protected function email(): Attribute
+    {
+        return Attribute::make(set: fn (string $value): string => mb_strtolower(trim($value)));
+    }
+
+    public function staff(): BelongsTo
+    {
+        return $this->belongsTo(Staff::class);
+    }
+
+    public function clientScopes(): HasMany
+    {
+        return $this->hasMany(UserClientScope::class);
+    }
+
+    public function isActive(): bool
+    {
+        return $this->status === AccountStatus::Active && ($this->staff_id === null || $this->staff()->where('is_active', true)->exists());
+    }
+
+    public function canUseRiderInterface(): bool
+    {
+        return $this->isActive() && $this->can('rider.access') && $this->staff()->where('is_active', true)->where('is_rider', true)->exists();
+    }
+
+    public function hasClientScope(Client $client): bool
+    {
+        $instant = now()->format('Y-m-d H:i:s.uP');
+
+        return $this->isActive() && $client->is_active && $this->clientScopes()->where('client_id', $client->id)
+            ->where('valid_from', '<=', $instant)
+            ->where(fn ($query) => $query->whereNull('valid_to')->orWhere('valid_to', '>', $instant))->exists();
+    }
+}
