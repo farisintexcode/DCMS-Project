@@ -15,7 +15,7 @@ class BootstrapAdmin extends Command
 {
     protected $signature = 'dcms:bootstrap-admin {email} {--name=Administrator}';
 
-    protected $description = 'Provision the first local DCMS Admin with a prompted password';
+    protected $description = 'Provision the first local DebtOps Admin with a prompted password';
 
     public function handle(AuditWriter $audit): int
     {
@@ -42,7 +42,7 @@ class BootstrapAdmin extends Command
             $user->email_verified_at = now();
             $user->save();
             $user->assignRole('Admin');
-            $user->givePermissionTo(['roles.manage', 'scopes.manage']);
+            $user->givePermissionTo(['roles.manage', 'scopes.manage', 'users.invite']);
             $audit->record($user, 'bootstrap_admin', metadata: ['role' => 'Admin'], reason: 'Initial local development account');
         });
         $this->info('Admin provisioned. Client access requires an explicit scope grant.');

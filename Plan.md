@@ -1,10 +1,11 @@
-# DCMS — Project and Technical Development Plan
+# DebtOps — Project and Technical Development Plan
 
-**Confirmed scope update — 16 October 2026.** The user's confirmed DCMS requirements take precedence over the earlier DRMS parity baseline. **C** means confirmed DCMS capability; **P** denotes an implementation choice within that scope; **O/U** continue to describe only observed/unverified DRMS behaviour. Missing DRMS evidence does not defer Customer Management, automated column mapping, Rider workflows, attendance, Call Centre, email or WhatsApp. Provider selection, template wording and business policy values remain configuration/implementation decisions, not omitted features. See the Feature Coverage Matrix in Plan.md.
+**Confirmed scope update — 16 October 2026.** The user's confirmed DebtOps requirements take precedence over the earlier DRMS parity baseline. **C** means confirmed DebtOps capability; **P** denotes an implementation choice within that scope; **O/U** continue to describe only observed/unverified DRMS behaviour. Missing DRMS evidence does not defer Customer Management, automated column mapping, Rider workflows, attendance, Call Centre, email or WhatsApp. Provider selection, template wording and business policy values remain configuration/implementation decisions, not omitted features. See the Feature Coverage Matrix in Plan.md.
 
 Terminology: **Customer** is the UI/business term for the existing party record in **debtors** (Eloquent **Debtor**); **Rider** is collection staff in **staff**, linked one-to-one to **users**. **Client** remains the commissioning company. Retain these existing physical names and models: do not add parallel customers/customer_contacts/customer_addresses/rider_profiles/task_assignments/attachments/task_verifications tables for the same facts.
 
-Product: Debt Collector Management System (DCMS) · Developer: InteXcode (IXC)  
+Product: DebtOps — Debt Collection Management System · Developer: InteXcode (IXC)
+
 Reference: [DRMS — Senja Bina](https://drms.senjabina.my/) · Review date: 16 October 2026 (Asia/Kuala_Lumpur)
 
 ## 1. Document status and evidence boundary
@@ -14,7 +15,7 @@ This is an implementation planning baseline derived from an authenticated, non-d
 Use these labels throughout the four documents:
 
 - **O — Observed:** rendered page, field, option, or read-only interaction directly reviewed.
-- **P — Proposed:** implementation design; **C — Confirmed:** mandatory DCMS scope supplied by the user, including features beyond DRMS.
+- **P — Proposed:** implementation design; **C — Confirmed:** mandatory DebtOps scope supplied by the user, including features beyond DRMS.
 - **U — Unverified:** unavailable, empty, role-dependent, or requiring a live write to establish behaviour.
 
 The four requested artifacts are [Plan.md](Plan.md), [Module.md](Module.md), [Prototype.md](Prototype.md), and [Database.md](Database.md). Module and interface IDs provide traceability. No supplied password or real debtor/staff sample data is included. Routes containing `{id}` below are route patterns, not instructions to enumerate records.
@@ -23,7 +24,7 @@ The four requested artifacts are [Plan.md](Plan.md), [Module.md](Module.md), [Pr
 
 DRMS organizes recovery work around named assignment batches. Tasks are imported from Excel, allocated to staff using IWK ID ranges, inspected or marked for completion/payment update, verified, and reported. It also provides staff administration and a call-centre databank. Its task fields combine account, property, owner/tenant, visit, contact, LOD, CTOS, financial snapshot, and report information.
 
-DCMS will preserve those business capabilities as an independent InteXcode product. Its objectives are reliable assignment and collection execution, traceable verification, accurate client reporting, controlled handling of personal data, and a clear account history across multiple batches. It will use its own terminology, information architecture, database, and interface design.
+DebtOps will preserve those business capabilities as an independent InteXcode product. Its objectives are reliable assignment and collection execution, traceable verification, accurate client reporting, controlled handling of personal data, and a clear account history across multiple batches. It will use its own terminology, information architecture, database, and interface design.
 
 Success measures proposed for acceptance: every imported row accounted for; allocation history retained; no unauthorized cross-assignment access; report totals reconcile to their snapshot; all sensitive writes and exports auditable; failed jobs recoverable without duplicate data. Business owners must set operational targets during Phase 0.
 
@@ -58,9 +59,9 @@ Success measures proposed for acceptance: every imported row accounted for; allo
 
 ### Type and context findings
 
-Six task types were inspected through uploaded-task detail; COM DR remains U beyond its selectable option. Task source groups generally match the M06 dictionary, while uploaded Vacant detail uses a short occupancy/meter dictionary. The verification-context page for a completed Vacant task rendered the broad recovery field dictionary instead. Treat this as a context inconsistency to validate with the owner; do not copy it into DCMS. The source contained dummy-looking/misaligned values, so UI examples alone cannot establish reliable import column order or money/date types.
+Six task types were inspected through uploaded-task detail; COM DR remains U beyond its selectable option. Task source groups generally match the M06 dictionary, while uploaded Vacant detail uses a short occupancy/meter dictionary. The verification-context page for a completed Vacant task rendered the broad recovery field dictionary instead. Treat this as a context inconsistency to validate with the owner; do not copy it into DebtOps. The source contained dummy-looking/misaligned values, so UI examples alone cannot establish reliable import column order or money/date types.
 
-Counts are transient observations, not seeded DCMS requirements. Table headers included responsive hidden columns; DOM inspection read rendered table markup to inventory them. List exports, uploads, allocation, status writes, account creation, password changes, and deletion were not executed on live data.
+Counts are transient observations, not seeded DebtOps requirements. Table headers included responsive hidden columns; DOM inspection read rendered table markup to inventory them. List exports, uploads, allocation, status writes, account creation, password changes, and deletion were not executed on live data.
 
 ### Required discovery follow-up
 
@@ -73,9 +74,9 @@ Counts are transient observations, not seeded DCMS requirements. Table headers i
 | G05 | Positive databank example and template | Establish search keys, result columns, edit capability, provenance and retention. |
 | G06 | All type-specific collector forms, documents, attachments and photos | Confirm field options, required evidence, upload limits and generated document capability. |
 | G07 | Invalid save, duplicate, concurrent edit and delete/restore examples | Confirm actual server validation and destructive semantics safely. |
-| G08 | Reference attendance/audit/settings demonstrations if useful | Attendance is now confirmed DCMS scope. Configure schedules, grace/half-day rules and correction authority; DRMS construction status is historical evidence only. |
+| G08 | Reference attendance/audit/settings demonstrations if useful | Initial M10 rules/authority approved on 18 October 2026 (Module.md#m10-approved-policy). Explicit calendar assignments activate expectations; DRMS construction status is historical only. |
 
-These are reference-discovery follow-ups. They do not block implementing the confirmed DCMS workflow below. Legacy import field semantics and financial source interpretation still require fixtures; attendance rules, email content, quotas and provider capability settings must be finalized before their production activation.
+These are reference-discovery follow-ups. They do not block implementing the confirmed DebtOps workflow below. Legacy import field semantics and financial source interpretation still require fixtures; attendance rules, email content, quotas and provider capability settings must be finalized before their production activation.
 
 ## 4. Target users and authorization strategy
 
@@ -85,7 +86,7 @@ These are reference-discovery follow-ups. They do not block implementing the con
 
 Spatie roles bundle granular permissions; Laravel policies enforce current client scope, assignment ownership and field-level access on every request/Livewire action, export and download. Example permissions: customers.view/create/update/categorize, riders.manage, imports.map/confirm, tasks.create/assign/reassign/cancel, tasks.monitor, tasks.submit, tasks.verify, attendance.clock/view_own/view_all/correct/approve_correction/export, calls.record, communications.compose/send/bulk_send, templates.approve, whatsapp.message/call, reports.export, roles.manage and audit.view. A role label never bypasses these policies. Additional Super Admin, Call Centre Agent, Supervisor, Operations Manager and Finance User roles can be composed without new code paths.
 
-The baseline uses time-bound user_client_scopes plus action permissions; Riders additionally require current allocation for active work. Their own historical submissions/attendance remain accessible with masked customer detail after reassignment. Employment position and Rider eligibility remain staff attributes, separate from permissions. Preserve DRMS position codes 01 Staff, 02 Administrative, 03 Supervisor, 04 Manager, 05 Director, 99 System Admin and 06 Call Center as reference data; do not seed them as mandatory DCMS roles. Admin must not verify their own submission; correction approval and template approval use separate grants. Scope/role changes invalidate caches and are audited. Team/branch hierarchy and SaaS tenancy remain future organizational decisions.
+The baseline uses time-bound user_client_scopes plus action permissions; Riders additionally require current allocation for active work. Their own historical submissions/attendance remain accessible with masked customer detail after reassignment. Employment position and Rider eligibility remain staff attributes, separate from permissions. Preserve DRMS position codes 01 Staff, 02 Administrative, 03 Supervisor, 04 Manager, 05 Director, 99 System Admin and 06 Call Center as reference data; do not seed them as mandatory DebtOps roles. Admin must not verify their own submission; correction approval and template approval use separate grants. Scope/role changes invalidate caches and are audited. Team/branch hierarchy and SaaS tenancy remain future organizational decisions.
 
 ## 5. Functional scope and modules
 
@@ -121,6 +122,8 @@ Task Monitoring provides all/unassigned/assigned/in-progress/visited/pending-com
 <a id="plan-attendance"></a>
 
 Attendance is mandatory: server-timestamped clock-in/out, today/history for Rider, Admin dashboard/filter/export/correction. Configure work calendar, schedules, timezone, grace and half-day thresholds before production. Present/Late/Half Day derive from actual duration and the pinned policy; Absent derives only from an expected completed schedule with no attendance, and Leave from an authorized leave calendar entry. No assumed weekend/holiday absence. Corrections retain original punches, reason, before/after values and authorized approval. No GPS, biometrics or continuous tracking is required by this scope.
+
+The owner approved the initial M10 policy on 18 October 2026; see Module.md#m10-approved-policy for exact calculation, break, lateness, calendar, overnight and independent correction rules. Late is a separate flag, Incomplete never implies automatic absence, and no penalties/payroll are introduced. Seed the approved policy version only; explicit authorized Rider/date assignments activate calendar expectations. Configure new versions rather than mutate pinned rules. Admin visibility requires current shared client scope; own history remains personal. Separate correction approval stays a reserved grant.
 
 ### Admin KPIs (C)
 
@@ -197,7 +200,9 @@ Import kinds include customer, debt_account, assignment_batch, assignment (task)
 
 ### Email, templates, WhatsApp and queues (C)
 
-Initially provide exactly three logical approved email/letter options, each with immutable versions. Seed three draft slots; the content/subject must be configured and approved before sending. Allow only customer_name, account_number, outstanding_amount, due_date and company_name placeholders (extend through an explicit approved registry). Render escaped literal data, never executable Blade/user code. A missing required value blocks that recipient. Display the financial amount's source/date/currency. A letter uses the same selected template and a private PDF artifact; it is not recorded as an email delivery.
+M11 manual Call Centre precedes provider integrations and uses existing customers, contacts, collection_activities and follow_ups. Follow Module.md's M11 implementation contract (18 October 2026), including the owner-approved one-calendar-day/reason call backdating policy, immutable encrypted call context, scoped optional task access, versioned contacts and assigned-agent reminder resolution. Manual logs do not claim telephony delivery or post financial payments. M14 supplies real email/WhatsApp/voice history when its canonical communications schema and providers are implemented; legacy databank remains G05-gated.
+
+Initially provide exactly three logical approved email/letter options, each with immutable versions. Seed the three owner-approved version 1.0 defaults below; subsequent wording changes require draft submission and authorized approval before sending. Allow only customer_name, account_number, outstanding_amount, due_date and company_name placeholders (extend through an explicit approved registry). Render escaped literal data, never executable Blade/user code. A missing required value blocks that recipient. Display the financial amount's source/date/currency. A letter uses the same selected template and a private PDF artifact; it is not recorded as an email delivery.
 
 Email flow: scoped customer/contact selection → deduplicate/validate/suppress → personalized preview with frozen template/recipient/value versions → confirm exact eligible recipients → outbox → Redis email queue → provider attempts → receipts/history. Separate batch, recipient communication, attempt and event records avoid duplicated email-delivery tables. Queue counters show eligible/invalid/suppressed/queued/accepted/delivered/failed/unknown, with safe retries and per-row reasons. Authorization and contact eligibility are rechecked at dispatch. No customer addresses are exposed in shared To/CC headers.
 
@@ -221,7 +226,7 @@ Use infrastructure as code; isolated AWS accounts/environments, private database
 
 ### Domain and communication deployment (C)
 
-The DCMS production domain is **not yet supplied**. drms.senjabina.my remains the reference system and must not be repointed. Configure the approved DCMS domain in DNS, ACM TLS/ALB, APP_URL, trusted hosts/proxies, secure session/cookie scope and webhook callback URLs; use staging separately. Verify the sending domain and configure provider-approved SPF/DKIM/DMARC and callback signatures before email launch. Secrets Manager stores provider secrets; database records contain secret references only. Run queue workers/scheduler and public HTTPS webhook endpoints with bounded request size, signature verification, replay/idempotency checks and alarms. Sandbox/test recipient restrictions remain enforced in nonproduction. No domain purchase, DNS change, service signup or deployment is performed by this update.
+The DebtOps production domain is **not yet supplied**. drms.senjabina.my remains the reference system and must not be repointed. Configure the approved DebtOps domain in DNS, ACM TLS/ALB, APP_URL, trusted hosts/proxies, secure session/cookie scope and webhook callback URLs; use staging separately. Verify the sending domain and configure provider-approved SPF/DKIM/DMARC and callback signatures before email launch. Secrets Manager stores provider secrets; database records contain secret references only. Run queue workers/scheduler and public HTTPS webhook endpoints with bounded request size, signature verification, replay/idempotency checks and alarms. Sandbox/test recipient restrictions remain enforced in nonproduction. No domain purchase, DNS change, service signup or deployment is performed by this update.
 
 ## 9. Testing and acceptance strategy
 
@@ -253,7 +258,7 @@ The enlarged confirmed scope replaces the original estimate. Durations are indic
 
 | Phase | Indicative duration | Deliverable / exit gate |
 |---|---|---|
-| 0 Contracts and provider feasibility | 1–2 weeks | Confirm field/matching rules, attendance policy/calendar, three template content owners, DCMS domain, email quota/tier and WhatsApp messaging/calling capability matrix. |
+| 0 Contracts and provider feasibility | 1–2 weeks | Confirm field/matching rules, attendance policy/calendar, three template content owners, DebtOps domain, email quota/tier and WhatsApp messaging/calling capability matrix. |
 | 1 Foundation and identity | 2 weeks | Existing stack/Sail/CI/AWS staging, Admin/Rider permissions/scopes, customer/staff foundations, audit/outbox and provider interfaces. |
 | 2 Customers, categories and mapping intake | 3 weeks | Customer CRUD/history/categories, canonical field/alias registry, reusable profiles, mapping review, preview/import errors/progress/history. |
 | 3 Task operations and mobile Rider | 3–4 weeks | Manual/imported tasks, individual/selected/range allocation/reassignment, monitoring, visit/business/remarks, multi-proof upload and completion checklist. |
@@ -266,7 +271,7 @@ Indicative total: 18–24 weeks sequentially, subject to staffing and external p
 
 ## 12. Existing behaviour and recommended improvements
 
-| Existing DRMS behaviour (O unless noted) | Recommended DCMS improvement (P) |
+| Existing DRMS behaviour (O unless noted) | Recommended DebtOps improvement (P) |
 |---|---|
 | IWK range bulk operations and a Delete option | Preview affected count and exclusions, authorization, reason, dry run, recoverable cancellation and audit. |
 | Task status selector mixes completion and Payment Update | Separate work lifecycle, review lifecycle and payment-update marker. |
@@ -335,3 +340,17 @@ Future candidates outside these confirmed additions: documented cash ledger/rece
 Unchanged where sufficient: DRMS evidence register/source field dictionary, seven type values, PostgreSQL/stack fundamentals, private S3 metadata strategy, Spatie pivots, allocation history, financial snapshot safeguards, audit redaction, source control/CI baseline and scoped export principles. Enhanced: Admin/Rider access, dashboards, imports/mapping, tasks/review/mobile evidence, staff/attendance, Call Centre, report families, queue/provider/domain/test/roadmap contracts. Added only absent concepts: category membership, canonical mapping registry/profile/job decisions, immutable completion/proof snapshots, attendance schedules/punches/adjustments and channel-neutral communication/provider/voice data.
 
 No duplicate customers/rider_profiles/site_visits/call_logs/attachments/task_assignments/task_verifications/email_deliveries/whatsapp_messages tables or duplicate modules were created. The illustrative alternative names in the request are mapped to the existing core or a single new canonical structure. Latest scope: 14 module families and 70 interface entries/states; historical O entries retain evidence context and C sections define the target behaviour.
+
+### M06 approved initial Rider policy — 17 October 2026 (C)
+
+The owner approved the initial Rider vocabulary, five visit purposes and validation policies in [Module.md — M06 approved policy](Module.md#m06-approved-policy). Store mutable options/policies in reference_values rather than code. Existing assignment types declare allowed purposes/per-purpose overrides; new or malformed policies fail closed. Freeze versioned policy and lookup labels in each submission.
+
+Allow today/yesterday in Asia/Kuala_Lumpur, never future time; a selected time before the current local minute needs an encrypted Backdating Reason and redacted audit. Preserve server entry time. Admin corrections older than this limit require a future separately authorized workflow. Payment claims require evidence, never a ledger posting. Applicable businesses require coded type/nature/status and Other explanation. Conditional signboard/payment evidence and follow-up due rules are specified in Module.md.
+
+Validate bounded raster content/dimensions/count, remove unnecessary EXIF, store private encrypted S3 with exact task/activity/uploader/time, and queue fail-closed scans on media via durable outbox. Defaults remain 10 MiB and ten clean images/submission. JPEG/PNG/WebP are supported; HEIC requires a safe decoder unavailable in this runtime. Signed temporary selections require private encrypted production volumes and cleanup. Actual S3/Redis/ClamAV, Docker and physical-device camera tests remain deployment integration gates. Submission is pending verification; only M07 independent approval completes work.
+
+M14 implementation increment 1 (18 October 2026): implement UI65 template management and scoped saved-content previews first. Seed the three owner-approved version 1.0 email defaults, preserve approved versions, separate templates.manage/templates.approve grants, and keep delivery/letter artifacts gated until reviewed recipient snapshots, approved content and verified provider/private-storage capabilities exist. No financial amount or payment due date is inferred from task/batch scheduling. Existing canonical customer/account/task records provide nonfinancial context; outstanding_amount/due_date remain unavailable until approved financial provenance exists.
+
+M14 owner-approved implementation contract (18 October 2026): initial defaults are Friendly Payment Reminder, Outstanding Balance Follow-Up, and Final Follow-Up Notice, using the exact subjects/bodies supplied by the owner in this session. All five registry placeholders are required in these version 1.0 defaults. Preserve text and names in the initial-default seed; no manual client/payment data is invented. Statuses are Draft, Pending Approval, Approved, Rejected, Archived. Drafts are editable with a lock version; submission freezes content for reserved-permission review. Rejection requires a retained reason/reviewer/time; revision creates a new draft. The existing approved version remains active while a replacement is draft, pending or rejected; replacement approval atomically archives the previous approved version. Published and rejected history cannot be rewritten. Generic template approval follows the separate templates.approve grant; no additional self-approval rule is inferred.
+
+Initial approved defaults record approval_source=owner_default and an approval_reference identifying the 18 October 2026 owner authorization, with no fabricated user FK; approved_at records application of this authorized default. Subsequent approvals record the authorized user's approved_by/time. Add name, submitted_by/at, rejected_by/at, encrypted rejection_reason_ciphertext and retained approval-source/reference metadata on the canonical communication_templates table. Seed only missing initial versions and preserve later business edits. Display the initial integer version as 1.0. Explicit synthetic previews may use labeled illustrative amount/date values; those values never enter actual-customer context or any delivery. Actual-customer previews continue to block required financial amount/payment date without approved provenance. Only Approved versions may enter the later recipient/send workflow; current template preview creates no communication or letter artifact.

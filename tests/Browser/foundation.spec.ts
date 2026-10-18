@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 test('public entry is usable and remains within the viewport', async ({ page }) => {
     await page.goto('/login');
@@ -29,7 +29,7 @@ test('synthetic credentials open only the intended workspace and sign out', asyn
     await page.getByLabel('Email', { exact: true }).fill(email!);
     await page.getByLabel('Password', { exact: true }).fill(password!);
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-    await expect(page).toHaveURL(mobile ? /\/rider$/ : /\/admin$/);
+    await expect(page).toHaveURL(mobile ? /\/rider$/ : /\/admin$/, { timeout: 90000 });
     await expect(page.getByRole('heading', { name: /Welcome,/ })).toBeVisible();
     if (mobile) {
         await expect(page.getByRole('navigation', { name: 'Rider navigation' })).toBeVisible();

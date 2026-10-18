@@ -53,6 +53,19 @@ services:
       test: ['CMD', 'redis-cli', 'ping']
       retries: 5
       timeout: 5s
+  clamav:
+    image: clamav/clamav:stable
+    profiles: [imports]
+    volumes:
+      - sail-clamav:/var/lib/clamav
+    networks: [sail]
+    mem_limit: 4g
+    healthcheck:
+      test: ['CMD', 'clamdcheck.sh']
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 180s
   mailpit:
     image: axllent/mailpit:v1.27
     ports:
@@ -63,6 +76,8 @@ networks:
   sail:
     driver: bridge
 volumes:
+  sail-clamav:
+    driver: local
   sail-pgsql:
     driver: local
   sail-redis:

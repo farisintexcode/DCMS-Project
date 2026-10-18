@@ -8,6 +8,7 @@ use App\Models\Contact;
 use App\Models\Debtor;
 use App\Models\User;
 use App\Services\AuditWriter;
+use App\Services\Customers\CustomerContacts;
 use App\Services\Customers\CustomerSearch;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -18,7 +19,7 @@ use Illuminate\Validation\ValidationException;
 /** Plan.md customer contract / M13 / UI63 / Database.md party/contact/category tables. */
 class SaveCustomer
 {
-    public function __construct(private CustomerSearch $search, private AuditWriter $audit, private SyncCustomerCategories $categories) {}
+    public function __construct(private CustomerSearch $search, private AuditWriter $audit, private SyncCustomerCategories $categories, private CustomerContacts $contacts) {}
 
     public function handle(User $actor, array $input, ?Debtor $existing = null, ?string $revision = null): Debtor
     {
@@ -66,7 +67,7 @@ class SaveCustomer
             $data = $validator->validated();
             if (array_key_exists('contacts', $data)) {
                 abort_unless($actor->can('customers.update_contacts'), 403);
-                $this->validateContacts($data['contacts']);
+                $this->contacts->validate($data['contacts']);
             }
             $before = $existing ? ['status' => $customer->status, 'party_type' => $customer->party_type] : [];
             $customer->client_id = $client->id;
@@ -91,7 +92,7 @@ class SaveCustomer
             }
             $customer->save();
             if (array_key_exists('contacts', $data)) {
-                $this->saveContacts($customer, $data['contacts'], $actor);
+                $this->contacts->sync($customer, $data['contacts'], $actor);
             }
             if (array_key_exists('addresses', $data)) {
                 $this->saveAddresses($customer, $data['addresses'], $actor);
@@ -110,55 +111,6 @@ class SaveCustomer
     private function invalid(array $errors): never
     {
         throw ValidationException::withMessages(collect($errors)->mapWithKeys(fn ($messages, $key) => ['data.'.$key => $messages])->all());
-    }
-
-    private function validateContacts(array $contacts): void
-    {
-        $primary = [];
-        $seen = [];
-        foreach ($contacts as $index => $contact) {
-            $value = trim($contact['value']);
-            if ($contact['kind'] === 'email' ? ! filter_var($value, FILTER_VALIDATE_EMAIL) : ! preg_match('/^[+0-9][0-9 ()\-.]{4,39}$/', $value)) {
-                $this->invalid(["contacts.$index.value" => ['Enter a valid email address or telephone number for the selected type.']]);
-            }
-            $key = $contact['kind'].':'.$this->search->contact($contact['kind'], $value);
-            if (in_array($key, $seen, true)) {
-                $this->invalid(["contacts.$index.value" => ['Duplicate contact in this customer.']]);
-            }
-            $seen[] = $key;
-            if ($contact['is_primary'] && isset($primary[$contact['kind']])) {
-                $this->invalid(["contacts.$index.is_primary" => ['Choose only one primary contact per type.']]);
-            }
-            if ($contact['is_primary']) {
-                $primary[$contact['kind']] = true;
-            }
-        }
-    }
-
-    private function saveContacts(Debtor $customer, array $items, User $actor): void
-    {
-        $current = $customer->contacts()->whereNull('valid_to')->get();
-        $retained = [];
-        foreach ($items as $item) {
-            $value = trim($item['value']);
-            $match = $current->first(fn ($row) => $row->kind_code === $item['kind'] && $row->value_ciphertext === $value && $row->is_primary === $item['is_primary'] && ! in_array($row->id, $retained));
-            if ($match) {
-                $retained[] = $match->id;
-
-                continue;
-            }
-            $row = new Contact;
-            $row->debtor_id = $customer->id;
-            $row->kind_code = $item['kind'];
-            $row->value_ciphertext = $value;
-            $row->value_fingerprint = $this->search->token('contact:'.$item['kind'], $this->search->contact($item['kind'], $value));
-            $row->is_primary = $item['is_primary'];
-            $row->source = 'admin:'.$actor->public_id;
-            $row->valid_from = now();
-            $row->save();
-        }
-        $instant = now()->format('Y-m-d H:i:s.uP');
-        $customer->contacts()->whereIn('id', $current->pluck('id')->diff($retained))->update(['valid_to' => $instant, 'updated_at' => $instant]);
     }
 
     private function saveAddresses(Debtor $customer, array $items, User $actor): void

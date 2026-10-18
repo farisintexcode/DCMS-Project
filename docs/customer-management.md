@@ -4,7 +4,7 @@ Tracking notes only. Root Plan.md, Module.md, Prototype.md and Database.md remai
 
 | Requirement | Interface | Persistence / implementation |
 |---|---|---|
-| Module.md M13 customer list, search and maintenance; Plan.md customer contract and security strategy | Prototype.md UI62 / UI63 | debtors; DebtorPolicy, CustomerAccess, CustomerSearch, SaveCustomer |
+| Module.md M13 customer list, search and maintenance; Plan.md customer contract and security strategy | Prototype.md UI62 / UI63 | debtors; DebtorPolicy, ClientAccess, CustomerSearch, SaveCustomer |
 | M13 customer details, current contacts/addresses and provenance | UI24 / UI63 | contacts / addresses; encrypted values, append-and-expire observations |
 | M13 client-specific categories, multiple memberships, assign/revoke | UI61 / UI24 / UI63 | customer_categories / customer_category_assignments; CustomerCategoryPolicy, SaveCategory, SyncCustomerCategories |
 | Permission plus effective client portfolio scope | UI61–63 / UI24 | users, user_client_scopes, Spatie grants; scoped reads and transactional authorization checks |

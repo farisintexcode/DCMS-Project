@@ -1,6 +1,6 @@
-# DCMS — PostgreSQL and Laravel Data Architecture Blueprint
+# DebtOps — PostgreSQL and Laravel Data Architecture Blueprint
 
-**Confirmed scope update — 16 October 2026.** The user's confirmed DCMS requirements take precedence over the earlier DRMS parity baseline. **C** means confirmed DCMS capability; **P** denotes an implementation choice within that scope; **O/U** continue to describe only observed/unverified DRMS behaviour. Missing DRMS evidence does not defer Customer Management, automated column mapping, Rider workflows, attendance, Call Centre, email or WhatsApp. Provider selection, template wording and business policy values remain configuration/implementation decisions, not omitted features. See the Feature Coverage Matrix in Plan.md.
+**Confirmed scope update — 16 October 2026.** The user's confirmed DebtOps requirements take precedence over the earlier DRMS parity baseline. **C** means confirmed DebtOps capability; **P** denotes an implementation choice within that scope; **O/U** continue to describe only observed/unverified DRMS behaviour. Missing DRMS evidence does not defer Customer Management, automated column mapping, Rider workflows, attendance, Call Centre, email or WhatsApp. Provider selection, template wording and business policy values remain configuration/implementation decisions, not omitted features. See the Feature Coverage Matrix in Plan.md.
 
 Terminology: **Customer** is the UI/business term for the existing party record in **debtors** (Eloquent **Debtor**); **Rider** is collection staff in **staff**, linked one-to-one to **users**. **Client** remains the commissioning company. Retain these existing physical names and models: do not add parallel customers/customer_contacts/customer_addresses/rider_profiles/task_assignments/attachments/task_verifications tables for the same facts.
 
@@ -8,7 +8,7 @@ InteXcode (IXC) · 16 October 2026 · Proposed normalized schema derived from ob
 
 ## Evidence, readiness and naming
 
-This is the expanded confirmed DCMS design, not a reverse-engineered DRMS schema. E01–E24 and G01–G08 remain reference evidence/follow-ups. C defines required product behaviour; table/constraint choices are P. Legacy template/data semantics need fixtures, while attendance policy values, template wording and provider enablement are release configuration gates. The absence of a DRMS feature does not block implementing confirmed attendance, mapping, Customer Management or communications.
+This is the expanded confirmed DebtOps design, not a reverse-engineered DRMS schema. E01–E24 and G01–G08 remain reference evidence/follow-ups. C defines required product behaviour; table/constraint choices are P. Legacy template/data semantics need fixtures, while attendance policy values, template wording and provider enablement are release configuration gates. The absence of a DRMS feature does not block implementing confirmed attendance, mapping, Customer Management or communications.
 
 PostgreSQL database with UTF-8; snake_case plural tables, singular snake_case foreign keys, PascalCase Eloquent models. Avoid naming SQL tables simply assignments because batch and collector allocation have distinct lifecycles. Recommended baseline is one IXC operating organization with multiple client namespaces. Full SaaS tenancy/branch security requires a separate design; a client_id by itself is not a complete authorization model.
 
@@ -808,14 +808,14 @@ erDiagram
 | lock_version | integer | Yes | 0 | See constraints below | Optimistic concurrency |
 | customer_id | bigint | Yes | — | FK → debtors.id; indexed | Explicit primary customer for task; distinct from all account parties |
 | created_by | bigint | Yes | — | FK → users.id; indexed | Manual creator or authorized importer |
-| origin_code | varchar(24) | Yes | 'import' | CHECK manual/import | Task creation origin |
+| origin_code | varchar(24) | Yes | 'manual' | CHECK manual/import | Initial manual intake; future import adapters must explicitly set import and source provenance |
 | priority_category | varchar(50) | Yes | 'priority' | CHECK constant | Lookup namespace |
 | priority_code | varchar(64) | Yes | 'normal' | Composite FK (priority_category,priority_code) → reference_values(category,code); indexed | low/normal/high/urgent configurable references |
 | scheduled_visit_at | timestamptz | No | NULL | Index | Planned visit time |
 | due_at | timestamptz | No | NULL | Index with work_status | Task-specific due time; batch due date is fallback rule |
 | review_status | varchar(24) | Yes | 'none' | CHECK none/pending/approved/returned | Transactionally maintained current review projection |
 
-**Constraints, indexes, validation, relationships and remarks:** Partial UNIQUE(assignment_batch_id,source_iwk_id) WHERE source_iwk_id IS NOT NULL; source contracts still require G02 duplicate-key fixtures. Unique source_import_row_id when non-null. Index(assignment_batch_id,work_status,id),(debt_account_id,created_at). Cross-client batch/account consistency checked in transaction/DB trigger. IWK numeric range uses validated numeric projection or cast only after template assures numeric IDs; never lexical range. Source snapshot immutable.
+**Constraints, indexes, validation, relationships and remarks:** Partial UNIQUE(assignment_batch_id,source_iwk_id) WHERE source_iwk_id IS NOT NULL; source contracts still require G02 duplicate-key fixtures. Unique source_import_row_id when non-null. Index(assignment_batch_id,work_status,id),(debt_account_id,created_at). Cross-client batch/account consistency checked in transaction/DB trigger. IWK numeric range uses validated numeric projection or cast only after template assures numeric IDs; never lexical range. Source snapshot immutable. M05 initial manual-task editing keeps batch/account/customer/type/source identity fixed; correcting that context requires recoverable cancellation and a new task. Priority, timing and instructions remain editable before submitted/completed/cancelled states.
 
 
 **Confirmed-scope constraints / relationships:** C: required customer belongs to account/client, verified transaction/constraint trigger; preserve account_parties history. Manual task supplies encrypted origin snapshot and no fake IWK key; source_import_row nullable. Canonical work_status retained; work_status=submitted iff current review pending; completed requires approved review. Returned review has in_progress work; starting correction clears projection to none. Index(customer_id,work_status,due_at), (assignment_batch_id,review_status), (priority_code,due_at); audit + task_status_histories on each action. Existing source-key uniqueness is now partial WHERE source_iwk_id IS NOT NULL. Imported tasks require nonnull valid source key, unless an approved template supplies another deterministic occurrence key.
@@ -845,6 +845,8 @@ erDiagram
 <a id="table-collection_activities"></a>
 
 ## Table: collection_activities
+
+**M11 physical extension (18 October 2026):** nullable `call_details_ciphertext` TEXT with encrypted:array cast and hidden serialization stores versioned outgoing/manual direction, selected phone snapshot, outcome label, Other detail and optional PTP narrative/date/decimal-string amount/currency. Existing person_contacted/notes/backdating_reason and created_at preserve typed narrative, approved historical justification and server entry time. Calls remain immutable, use existing customer/contact/task context guards and UUID idempotency; no duplicate call table. Index(customer_id,occurred_at,id) supports scoped chronological history. One-day MYT backdating with reason follows owner approval in Module.md M11. Outcome reference metadata.activity_types separates call-only values from site visits; Promise to Pay supports both. Legacy visit outcomes without that metadata retain their visit meaning.
 
 - **Purpose / description:** Append-oriented call, visit or TPS outcome.
 - **Module / evidence:** M06; E14 visit/agent/counts and E16 TPS; event history P. Physical design P.
@@ -967,6 +969,8 @@ erDiagram
 
 ## Table: follow_ups
 
+**M11 physical extension:** add nonnegative `lock_version` integer default 0, nullable `resolved_by` FK users (indexed), nullable `resolved_at` timestamptz and encrypted hidden `resolution_ciphertext` TEXT. Existing pending records keep null decision fields. An assigned agent resolves a pending call reminder once to done/cancelled, preserving customer/task/activity/assignee/due/type/original notes; decision fields and lock_version advance atomically with redacted audit. `completed_at` is set only for done. PostgreSQL rejects mutation/deletion of resolved history and request-context changes. Preserve existing M06 data; no speculative communications/voice FKs before M14 parents exist.
+
 - **Purpose / description:** Actionable reminder linked to task/activity.
 - **Module / evidence:** M06; E14 upDateReminder/count; scheduling P. Physical design P.
 - **Model:** FollowUp.
@@ -1006,7 +1010,7 @@ erDiagram
 | reviewer_id | bigint | Yes | — | FK → users.id; indexed | Authorized reviewer |
 | submission_version | integer | Yes | — | Unique with task_id | Completion cycle version; equals task_submissions.submission_version |
 | decision | varchar(24) | Yes | — | See constraints below | approved/returned |
-| reason | text | No | NULL | See constraints below | Return/correction reason |
+| reason | text | No | NULL | See constraints below | Encrypted verification remarks via model cast; nonblank plaintext required when returned |
 | reviewed_at | timestamptz | Yes | now() | See constraints below | Decision time |
 | supersedes_review_id | bigint | No | NULL | FK → task_reviews.id; indexed | Previous decision if corrected |
 | submission_id | bigint | Yes | — | FK → task_submissions.id; indexed | Exactly one immutable completion submission being reviewed |
@@ -1148,15 +1152,16 @@ erDiagram
 | assignment_batch_id | bigint | Yes | — | FK → assignment_batches.id; indexed | Scope |
 | operation_code | varchar(32) | Yes | — | See constraints below | new/replace/reassign/unassign/cancel |
 | target_collector_id | bigint | No | NULL | FK → staff.id; indexed | Required except unassign/cancel |
-| from_iwk_id | varchar(100) | Yes | — | See constraints below | Source range start |
-| to_iwk_id | varchar(100) | Yes | — | See constraints below | Source range end |
+| selection_mode | varchar(24) | Yes | — | CHECK single/selected/range | Explicit selection contract; no invented source keys |
+| from_iwk_id | varchar(100) | Range only | NULL | Required only for range mode | Source range start |
+| to_iwk_id | varchar(100) | Range only | NULL | Required only for range mode | Source range end |
 | reason | text | Yes | — | See constraints below | Operation rationale |
 | preview_digest | char(64) | Yes | — | See constraints below | Selected task/version digest |
 | idempotency_key | uuid | Yes | application UUID v7 | See constraints below | Repeat protection |
 | status | varchar(24) | Yes | 'previewed' | See constraints below | previewed/queued/running/completed/failed/cancelled |
 | result_counts | jsonb | Yes | '{}' | See constraints below | Selected/applied/excluded/failed counts |
 
-**Constraints, indexes, validation, relationships and remarks:** Unique idempotency_key; indexes(assignment_batch_id,created_at),(status,created_at). Revalidate exact selected versions; no hidden range expansion. Current selection persisted in bulk_operation_items.
+**Constraints, indexes, validation, relationships and remarks:** Unique idempotency_key; indexes(assignment_batch_id,created_at),(status,created_at). Revalidate exact selected versions; no hidden range expansion. Current selection persisted in bulk_operation_items. Range bounds must be null for single/selected modes. Confirm recomputes the digest of exact task IDs, versions and current allocations; queued selections cannot expand and applied results cannot be rewritten.
 
 <a id="table-bulk_operation_items"></a>
 
@@ -1532,7 +1537,7 @@ erDiagram
 | completion_snapshot_ciphertext | text | Yes | — | See constraints below | Frozen customer/visit/business/typed remarks/mandatory checklist/supporting data |
 | idempotency_key | uuid | Yes | application UUID v7 | See constraints below | Duplicate tap/retry protection |
 
-**Constraints, indexes, validation, relationships and remarks:** Unique(task_id,submission_version), unique idempotency_key; index(submitted_by,submitted_at). No update of accepted snapshot. Submission hasMany submissionDocuments and hasOne TaskReview; only clean owned task evidence at submit. Reviewer != submitted_by; history access remains scoped. Pending status derived from task projection and lack of decision.
+**Constraints, indexes, validation, relationships and remarks:** Unique(task_id,submission_version), unique idempotency_key; index(submitted_by,submitted_at); index(submitted_at,id) supports the M07 date-ordered queue and date filters. No update of accepted snapshot. Submission hasMany submissionDocuments and hasOne TaskReview; only clean owned task evidence at submit. Reviewer != submitted_by; history access remains scoped. Pending status derived from task projection and lack of decision.
 
 <a id="table-task_submission_documents"></a>
 
@@ -1555,6 +1560,8 @@ erDiagram
 
 ## Table: attendance_policies
 
+**M10 approved physical contract — 18 October 2026:** Module.md#m10-approved-policy supersedes the earlier illustrative attendance status/rule vocabulary. `rules` is a typed versioned object: `workdays` (ISO weekdays), `shift_start`, `shift_end`, `break_minutes`, `grace_minutes`, `present_minutes`, `half_day_minutes`, `overnight_allowed`. The initial approved version is Mon–Fri/09:00–18:00/60/15/420/240/true; standard shifts do not cross midnight. No default Rider assignment is seeded. Policy revisions are immutable.
+
 - **Purpose / description:** Versioned business timezone and attendance computation rules.
 - **Module / evidence:** M10; C confirmed scope, P relational implementation.
 - **Model:** AttendancePolicy.
@@ -1565,7 +1572,7 @@ erDiagram
 | code | varchar(64) | Yes | — | See constraints below | Policy identity |
 | version | integer | Yes | 1 | See constraints below | Immutable revision |
 | timezone | varchar(64) | Yes | 'Asia/Kuala_Lumpur' | See constraints below | IANA business timezone |
-| rules | jsonb | Yes | — | See constraints below | Approved workdays/late grace/half-day worked-minute threshold/overnight policy |
+| rules | jsonb | Yes | — | See constraints below | Approved workdays/start/end/unpaid break/grace/Present/Half Day/overnight rules |
 | is_active | boolean | Yes | false | See constraints below | Configured and approved for schedules |
 | approved_by | bigint | No | NULL | FK → users.id; indexed | Policy authority |
 | approved_at | timestamptz | No | NULL | See constraints below | Approval time |
@@ -1575,6 +1582,8 @@ erDiagram
 <a id="table-attendance_schedules"></a>
 
 ## Table: attendance_schedules
+
+Daily rows are explicit schedule assignments and work calendar entries, reusing staff and policies. Extend `day_type` to `scheduled/leave/day_off/public_holiday/cancelled`, add nonnegative `lock_version` for schedule-only correction comparison. `day_off` displays Rest Day; cancelled means deactivated with retained history. No overlapping scheduled intervals per Rider. Calendar changes require immutable independent correction decisions; do not delete history. Original values remain in the adjustment snapshot.
 
 - **Purpose / description:** Expected Rider service date/shift and leave/day-off exceptions.
 - **Module / evidence:** M10; C confirmed scope, P relational implementation.
@@ -1586,17 +1595,20 @@ erDiagram
 | rider_id | bigint | Yes | — | FK → staff.id; indexed | Rider |
 | policy_id | bigint | Yes | — | FK → attendance_policies.id; indexed | Pinned rule version |
 | service_date | date | Yes | — | See constraints below | Local scheduled start date |
-| day_type | varchar(24) | Yes | — | See constraints below | scheduled/leave/day_off |
+| day_type | varchar(24) | Yes | — | See constraints below | scheduled/leave/day_off/public_holiday/cancelled |
 | scheduled_start_at | timestamptz | No | NULL | See constraints below | Required for scheduled day |
 | scheduled_end_at | timestamptz | No | NULL | See constraints below | Can be next local date |
 | authorized_by | bigint | Yes | — | FK → users.id; indexed | Schedule/leave authority |
 | remarks | text | No | NULL | See constraints below | Schedule exception reason |
+| lock_version | integer | Yes | 0 | CHECK >=0 | Schedule-only optimistic correction version |
 
 **Constraints, indexes, validation, relationships and remarks:** Unique(rider_id,service_date) for initial single-shift/day scope; index(service_date,day_type). Scheduled days require ordered start/end; leave/day_off not treated as missing punches. Absence report derives only after end of expected scheduled shift with no attendance. Missing schedule=unscheduled/needs review. Split-shift expansion is a future policy, not fabricated rows.
 
 <a id="table-attendances"></a>
 
 ## Table: attendances
+
+Add `worked_minutes` nullable nonnegative integer, `is_late` boolean default false and `late_minutes` nonnegative integer default 0. Stored main statuses: present/half_day/incomplete/needs_review (retain late as a compatible historical code); Late is an independent flag. Open/Pending Correction are report overlays, Absent/Leave/Rest Day/Public Holiday derive from schedule. Unique nonnull schedule and unique unscheduled (rider_id,service_date) prevent repeat shifts. Operational-open partial uniqueness uses `effective_clock_out_at IS NULL` so an approved missed-clock-out correction can close work without altering the null raw event. Punch operations additionally block unresolved raw-open records until effective close. Raw in/out and request keys never change after their initial write; all effective corrections reference independently approved immutable adjustments.
 
 - **Purpose / description:** Raw clock events and current effective attendance projection.
 - **Module / evidence:** M10; C confirmed scope, P relational implementation.
@@ -1612,17 +1624,22 @@ erDiagram
 | raw_clock_out_at | timestamptz | No | NULL | See constraints below | Server time, written only once |
 | effective_clock_in_at | timestamptz | Yes | — | See constraints below | Raw or approved adjusted projection |
 | effective_clock_out_at | timestamptz | No | NULL | See constraints below | Raw or approved adjusted projection |
-| status | varchar(24) | Yes | 'needs_review' | See constraints below | present/late/half_day/needs_review; absence/leave from schedule report |
+| status | varchar(24) | Yes | 'needs_review' | See constraints below | present/half_day/incomplete/needs_review; legacy late accepted; Late now independent; calendar statuses projected |
+| worked_minutes | integer | No | NULL | CHECK >=0 | Effective duration less pinned fixed unpaid break, floored at zero |
+| is_late | boolean | Yes | false | See constraints below | Arrival after scheduled start plus inclusive grace |
+| late_minutes | integer | Yes | 0 | CHECK >=0 | Minutes after scheduled start when Late is true |
 | remarks | text | No | NULL | See constraints below | Own shift remarks |
 | clock_in_request_id | uuid | Yes | application UUID v7 | See constraints below | Idempotent clock-in |
 | clock_out_request_id | uuid | No | NULL | See constraints below | Idempotent clock-out |
 | lock_version | integer | Yes | 0 | See constraints below | Concurrent action/correction protection |
 
-**Constraints, indexes, validation, relationships and remarks:** Unique clock_in_request_id; unique nonnull clock_out_request_id; unique nonnull schedule_id; partial UNIQUE(rider_id) WHERE raw_clock_out_at IS NULL. Index(rider_id,service_date),(service_date,status). Ordered raw/effective times; own active user only. First raw clock-out is immutable thereafter; adjustments change effective projection only. Overnight interval belongs to scheduled start service_date. No Absent/Leave raw attendance row fabricated for missing punches.
+**Constraints, indexes, validation, relationships and remarks:** Unique clock_in_request_id; unique nonnull clock_out_request_id; unique nonnull schedule_id; unique unscheduled(rider_id,service_date); partial UNIQUE(rider_id) WHERE effective_clock_out_at IS NULL. Index(rider_id,service_date),(service_date,status). Ordered raw/effective times; own active staff account only. First raw clock-out is immutable thereafter; approved missed-clock-out correction closes only the effective interval. Overnight interval belongs to scheduled start service_date. No Absent/Leave raw attendance row fabricated for missing punches.
 
 <a id="table-attendance_adjustments"></a>
 
 ## Table: attendance_adjustments
+
+Initial requests target either an existing scheduled attendance or a schedule-only calendar entry. Snapshot includes target lock version, effective times/status and calendar values; approved changes compare the exact snapshot under Rider/target locks. Once-reviewed decisions and request payloads are immutable. Pending requests are unique per schedule. Approval records and audit are atomic; own database notifications contain safe references only. Unscheduled punches require an authorized schedule-link correction before time corrections, preserving raw times and service date. Reasons/remarks remain authorized history and are excluded from audit metadata/notifications/exports.
 
 - **Purpose / description:** Append-only correction request/decision with original and effective values.
 - **Module / evidence:** M10; C confirmed scope, P relational implementation.
@@ -1685,13 +1702,13 @@ erDiagram
 | subject_template | text | No | NULL | See constraints below | Required for email |
 | body_template | text | Yes | — | See constraints below | Approved static body with safe placeholders |
 | allowed_placeholders | jsonb | Yes | — | See constraints below | Subset of approved global registry and required flags |
-| status | varchar(24) | Yes | 'draft' | See constraints below | draft/approved/inactive |
+| status | varchar(24) | Yes | 'draft' | See constraints below | draft/pending_approval/approved/rejected/archived |
 | approved_by | bigint | No | NULL | FK → users.id; indexed | Content approver |
 | approved_at | timestamptz | No | NULL | See constraints below | Approval time |
 | integration_account_id | bigint | No | NULL | FK → integration_accounts.id; indexed | WhatsApp template provider scope where needed |
 | provider_template_reference | varchar(160) | No | NULL | See constraints below | External template approval identifier |
 
-**Constraints, indexes, validation, relationships and remarks:** Unique(channel,code,version); positive version. CHECK email has slot 1..3 + subject; WhatsApp email_slot null. Partial UNIQUE(email_slot) WHERE channel=email AND status=approved: at most one current approved version per each of exactly three seeded logical slots. Published versions immutable. Seed three draft slots, require all three approved for release; never invent approved wording. Same email version may render letter PDF via documents; no duplicate letter_templates.
+**Constraints, indexes, validation, relationships and remarks:** Unique(channel,code,version); positive version. CHECK email has slot 1..3 + subject; WhatsApp email_slot null. Partial UNIQUE(email_slot) WHERE channel=email AND status=approved: at most one current approved version per each of exactly three seeded logical slots. Published versions immutable. Seed the three owner-approved version 1.0 defaults; require all three approved for release and never invent additional approved wording. Same email version may render letter PDF via documents; no duplicate letter_templates.
 
 <a id="table-communication_batches"></a>
 
@@ -1952,7 +1969,7 @@ For every configurable code above, migrations add a fixed category column (e.g. 
 | Activity / follow-up / outcome / DR code | Lookup | visit/call/TPS/reminder P starting values; actual DR codes and activity vocabularies require G06. |
 | Occupier/usage/property type/LOD acknowledgement/CTOS/proof/black area | Lookup | Do not invent source option lists. Preserve source text and map approved template values after G06. |
 | Contact/address type | Lookup | telephone/mobile/fax/email; billing/contact P from observed field groups. |
-| Document type and image category | Lookup | photo/workbook/avatar/report/bundle P; observed category labels Street (Sign Board), Permise 1, Permise 2, Meter. Correct DCMS spelling. |
+| Document type and image category | Lookup | photo/workbook/avatar/report/bundle P; observed category labels Street (Sign Board), Permise 1, Permise 2, Meter. Correct DebtOps spelling. |
 | Priority | Lookup | C task priority: low/normal/high/urgent initial configurable codes; type category priority. |
 | Debt/case/payment method/receipt transaction status | Deferred | Not established; do not introduce PostgreSQL ENUMs or tables by assumption. |
 | Limits, retention, feature toggles | Typed system_settings | Nonsecret versioned config; no fixed statutory retention duration asserted. |
@@ -2131,7 +2148,7 @@ Each migration is small and reversible where safe. Use expand/add nullable → b
 
 ### Seeders and factories
 
-Seed Admin/Rider role bundles and granular permissions, plus approved assignment/state/position/image/document/priority/business/call-outcome values; optionally compose future roles. Seed exactly three draft logical email template slots, approved placeholder registry, initial email cap 1000/day and mapping aliases/profile fixtures. Actual wording must be approved before sending. Legacy import templates require supplied fixtures; confirmed mapping registries have deterministic synthetic fixtures. Bootstrap admin uses an out-of-band invitation/secret mechanism; no default plaintext password in repository. Initial permission grants require business sign-off, not inference from position labels.
+Seed Admin/Rider role bundles and granular permissions, plus approved assignment/state/position/image/document/priority/business/call-outcome values; optionally compose future roles. Seed exactly three owner-approved version 1.0 logical email template slots, approved placeholder registry, initial email cap 1000/day and mapping aliases/profile fixtures. Actual wording must be approved before sending. Legacy import templates require supplied fixtures; confirmed mapping registries have deterministic synthetic fixtures. Bootstrap admin uses an out-of-band invitation/secret mechanism; no default plaintext password in repository. Initial permission grants require business sign-off, not inference from position labels.
 
 Factories generate synthetic staff/users/clients/parties/accounts/batches for all seven task types, source snapshots, valid/invalid imports, overlapping allocation ranges, activities/follow-ups, evidence metadata, returned/approved reviews and financial snapshots. Include missing/duplicate identifiers, leading zeros, unknown booleans, null dates, credits, duplicate payment-update sources, non-ASCII names and cross-client denial fixtures. Positive databank fixture must follow approved schema. Never copy actual account numbers, NRICs, addresses or login credentials into fixtures.
 
@@ -2167,7 +2184,7 @@ flowchart LR
 
 ## Existing approach and recommended design
 
-| Existing DRMS approach observed | Recommended DCMS design |
+| Existing DRMS approach observed | Recommended DebtOps design |
 |---|---|
 | Wide task data combines parties/property/amounts/outcomes | Normalize reusable entities and retain exact encrypted source snapshot for historical report parity. DRMS physical tables are U. |
 | Completion and Payment Update share an action selector | Distinct work state, immutable review decision and independent financial marker/update/snapshot. |
@@ -2182,3 +2199,17 @@ flowchart LR
 Resolve IWK uniqueness and numeric range assumptions; approve all template keys/required fields; clarify review lifecycle and finance semantics; obtain positive databank sample; approve other-role access and collector form options; select encryption/key rotation and retention policy; validate every FK/partial index/trigger in actual PostgreSQL; verify package migrations and Composer compatibility. This blueprint documents a comprehensive proposed core with explicit discovery-gated areas, not unobserved DRMS internals.
 
 For confirmed additions, approve configurable policies rather than defer modules: attendance work calendar/grace/half-day/correction authority; exactly three template subjects/bodies/placeholder requirements; email provider/account verified quota/window/rate and sending domain; WhatsApp messaging+calling sender/country/customer-permission/agent-route capability; per-kind field mappings, duplicate/update policy and task-type completion requirements. Validate Admin/Rider/client scopes, submitted snapshot immutability, atomic quota admission and safe webhook ordering. UI scope and schema are documented; production capability checks are explicitly not claims that an integration has been implemented or enabled.
+
+### M06 approved initial Rider policy — 17 October 2026 (C)
+
+The approved vocabulary and five purpose-specific evidence policies are defined in [Module.md M06](Module.md#m06-approved-policy). Store availability, visit_status, contact_result, activity_outcome, business_type/nature/status, image_category and visit_purpose in reference_values. Preserve legacy proof categories alongside the six new approved categories; do not map unknown source flags. Purpose metadata stores policy version, calendar-day backdate bound, minimum images, required categories/typed remarks, business applicability and conditional signboard rule. Assignment-type metadata.execution_policy stores version, allowed purpose codes and per-purpose overrides; never silently activate new types. Subsequent authorized master edits are preserved by initial seeding.
+
+**Approved physical extensions:** collection_activities adds fixed visit_purpose_category='visit_purpose' and visit_purpose_code composite reference FK, business_applicable/signboard_available declarations and encrypted backdating_reason_ciphertext. created_at is immutable original server entry time. documents adds nullable indexed activity_id FK to collection_activities; M06 proof requires matching task/customer/uploader context and an immutable visit link. No duplicate visits, remarks, proof or policy tables.
+
+Accepted task_submissions encrypt and freeze exact policy/labels, activity/time/entry time/backdate reason, business, remarks/follow-up and proof references. task_submission_documents freezes exact immutable Document metadata; manifest inserts must occur within the pending submission transition and cannot append to an accepted version. Only clean owned task/activity proof is eligible. The task/status-history submission FK is now active. Legacy-only TaskObservation/occupancy/LOD/CTOS mappings remain separate gated work. M07 will add immutable independent review decisions.
+
+M14 template increment 1 physical contract (18 October 2026): create integration_accounts as the disabled, unseeded provider parent before communication_templates; no provider activation or secrets are seeded. communication_templates adds nullable created_by FK users for system-created blank slots, nonnegative lock_version default 0, and nullable supersedes_id FK to the previous same-slot version. Stable email codes email_1..email_3 match email_slot, with one draft and one approved version per slot enforced by partial indexes. allowed_placeholders is a JSON object keyed only by used registry token, with {required:boolean} values validated by the application. Draft subject/body may be empty; submission requires nonblank content and review increments the version counter. User approvals record approver/time; owner-approved defaults retain explicit owner provenance. Database guards retain all rows, immutable identity/lineage/creator, published content and approval provenance; approved to archived is the only published transition, preserving original approval. Draft approval changes status/approval metadata only, preventing content substitution at approval. Global templates have no invented client namespace; customer preview uses existing current scope/account parties/tasks. No communications/attempt/financial rows or generated Document are fabricated by a preview.
+
+M14 owner-approved implementation contract (18 October 2026): initial defaults are Friendly Payment Reminder, Outstanding Balance Follow-Up, and Final Follow-Up Notice, using the exact subjects/bodies supplied by the owner in this session. All five registry placeholders are required in these version 1.0 defaults. Preserve text and names in the initial-default seed; no manual client/payment data is invented. Statuses are Draft, Pending Approval, Approved, Rejected, Archived. Drafts are editable with a lock version; submission freezes content for reserved-permission review. Rejection requires a retained reason/reviewer/time; revision creates a new draft. The existing approved version remains active while a replacement is draft, pending or rejected; replacement approval atomically archives the previous approved version. Published and rejected history cannot be rewritten. Generic template approval follows the separate templates.approve grant; no additional self-approval rule is inferred.
+
+Initial approved defaults record approval_source=owner_default and an approval_reference identifying the 18 October 2026 owner authorization, with no fabricated user FK; approved_at records application of this authorized default. Subsequent approvals record the authorized user's approved_by/time. Add name, submitted_by/at, rejected_by/at, encrypted rejection_reason_ciphertext and retained approval-source/reference metadata on the canonical communication_templates table. Seed only missing initial versions and preserve later business edits. Display the initial integer version as 1.0. Explicit synthetic previews may use labeled illustrative amount/date values; those values never enter actual-customer context or any delivery. Actual-customer previews continue to block required financial amount/payment date without approved provenance. Only Approved versions may enter the later recipient/send workflow; current template preview creates no communication or letter artifact.

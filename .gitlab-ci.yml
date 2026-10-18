@@ -58,8 +58,9 @@ foundation:
     SENTRY_LARAVEL_DSN: ''
     MAIL_MAILER: array
   before_script:
-    - apt-get update -qq && apt-get install -y -qq git unzip curl libpq-dev libzip-dev libonig-dev libxml2-dev libicu-dev
-    - docker-php-ext-install pdo_pgsql mbstring bcmath intl zip > /dev/null
+    - apt-get update -qq && apt-get install -y -qq git unzip curl libpq-dev libzip-dev libonig-dev libxml2-dev libicu-dev libpng-dev libjpeg62-turbo-dev libfreetype6-dev
+    - docker-php-ext-configure gd --with-freetype --with-jpeg
+    - docker-php-ext-install pdo_pgsql mbstring bcmath intl zip gd > /dev/null
     - curl -fsSLo composer-setup.php https://getcomposer.org/installer
     - test "$(sha384sum composer-setup.php | cut -d' ' -f1)" = "$(curl -fsSL https://composer.github.io/installer.sig)"
     - php composer-setup.php --install-dir=/usr/local/bin --filename=composer --quiet

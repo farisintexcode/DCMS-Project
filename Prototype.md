@@ -1,6 +1,6 @@
-# DCMS — Interface Inventory and Prototype Specification
+# DebtOps — Interface Inventory and Prototype Specification
 
-**Confirmed scope update — 16 October 2026.** The user's confirmed DCMS requirements take precedence over the earlier DRMS parity baseline. **C** means confirmed DCMS capability; **P** denotes an implementation choice within that scope; **O/U** continue to describe only observed/unverified DRMS behaviour. Missing DRMS evidence does not defer Customer Management, automated column mapping, Rider workflows, attendance, Call Centre, email or WhatsApp. Provider selection, template wording and business policy values remain configuration/implementation decisions, not omitted features. See the Feature Coverage Matrix in Plan.md.
+**Confirmed scope update — 16 October 2026.** The user's confirmed DebtOps requirements take precedence over the earlier DRMS parity baseline. **C** means confirmed DebtOps capability; **P** denotes an implementation choice within that scope; **O/U** continue to describe only observed/unverified DRMS behaviour. Missing DRMS evidence does not defer Customer Management, automated column mapping, Rider workflows, attendance, Call Centre, email or WhatsApp. Provider selection, template wording and business policy values remain configuration/implementation decisions, not omitted features. See the Feature Coverage Matrix in Plan.md.
 
 Terminology: **Customer** is the UI/business term for the existing party record in **debtors** (Eloquent **Debtor**); **Rider** is collection staff in **staff**, linked one-to-one to **users**. **Client** remains the commissioning company. Retain these existing physical names and models: do not add parallel customers/customer_contacts/customer_addresses/rider_profiles/task_assignments/attachments/task_verifications tables for the same facts.
 
@@ -16,7 +16,7 @@ Read [Plan.md](Plan.md) for evidence E01–E24 and unresolved G01–G08, [Module
 |---|---|
 | Related module / user role / purpose | Supplied by each entry and its M01–M12 module; role grants proposed until role demonstrations. |
 | Page layout | Shared shell: fixed header, collapsible sidebar, breadcrumb/title, main responsive content and footer. Standalone access cards and separate settings layout are explicitly identified. |
-| Header | DCMS / InteXcode identity, scoped search, own notifications and account menu. Show environment in nonproduction. |
+| Header | DebtOps / InteXcode identity, scoped search, own notifications and account menu. Show environment in nonproduction. |
 | Sidebar / navigation | Dashboard; Assignments (batches/import/allocation/tasks/verification); Reports; Staff; Databank; authorized Administration. Permission-aware. The observed menu graph is in Module.md. |
 | Breadcrumb | Home → module → list → record/action; access cards have no breadcrumb. List/filter state preserved on Back. |
 | Cards | None unless listed; metric/progress/error cards use text labels as well as colour. |
@@ -571,7 +571,7 @@ Read [Plan.md](Plan.md) for evidence E01–E24 and unresolved G01–G08, [Module
 | Buttons / actions | Export Images; P download/expire/retry |
 | Cards / tables / modals / tabs / status / empty state | Four categories observed. P count/size estimate, manifest, missing-image count and expiring bundle link. No images exported in review. |
 | Notifications / validation / pagination | Common contract; module rules in Module.md; actual DRMS enforcement U unless specifically observed above. |
-| Expected interaction / previous-next navigation | UI27 → UI29 → UI41 job → download; reauthorize download. Correct spelling to Premise in DCMS labels. |
+| Expected interaction / previous-next navigation | UI27 → UI29 → UI41 job → download; reauthorize download. Correct spelling to Premise in DebtOps labels. |
 
 <a id="ui30"></a>
 
@@ -629,7 +629,7 @@ Read [Plan.md](Plan.md) for evidence E01–E24 and unresolved G01–G08, [Module
 |---|---|
 | Module / evidence | M10 · C operational Attendance; O E19 construction page preserved as reference only. |
 | User role | HR P |
-| Purpose | Admin Attendance Dashboard/List; replaces the deferred DCMS placeholder with confirmed functionality. |
+| Purpose | Admin Attendance Dashboard/List; replaces the deferred DebtOps placeholder with confirmed functionality. |
 | Layout / header / sidebar / breadcrumb | Shared Admin shell, operational attendance metrics/filter/table; responsive labelled cards on small screens. DRMS construction page is historical evidence only. |
 | Forms / fields / dropdowns / search / filters | Rider/date range/status/client-scope filters; schedule policy/as-of/timezone; correction reason and proposed values in UI59. |
 | Buttons / actions | Search/reset; Rider/date detail; request/review correction; CSV/PDF export; schedule/policy configuration with permission. |
@@ -777,7 +777,7 @@ Read [Plan.md](Plan.md) for evidence E01–E24 and unresolved G01–G08, [Module
 | Layout / header / sidebar / breadcrumb | Shared task shell, verification/listing breadcrumbs; common shell rules apply unless standalone/separate. |
 | Forms / fields / dropdowns / search / filters | Immutable customer/Rider/submission/time/version, visit/outcome/person, business type/nature/status, all remarks, clean proof manifest/supporting info; verification remarks. |
 | Buttons / actions | Approve / Verify; Reject / Return (required remarks); previous/next pending submission; compare prior submission/decision; back to queue. |
-| Cards / tables / modals / tabs / status / empty state | Read-only submitted sections and image viewer; history timeline; permission/stale/own-submission block; approve/reject dialog. DCMS uses type-aware fields; reference-context dictionary inconsistency is not copied. |
+| Cards / tables / modals / tabs / status / empty state | Read-only submitted sections and image viewer; history timeline; permission/stale/own-submission block; approve/reject dialog. DebtOps uses type-aware fields; reference-context dictionary inconsistency is not copied. |
 | Notifications / validation / pagination | Common contract; module rules in Module.md; actual DRMS enforcement U unless specifically observed above. |
 | Expected interaction / previous-next navigation | UI26 eye → verification details → filtered Listing; state writes not submitted. |
 
@@ -795,7 +795,7 @@ Read [Plan.md](Plan.md) for evidence E01–E24 and unresolved G01–G08, [Module
 | Buttons / actions | Home/Dashboard breadcrumbs; each result cell is a button |
 | Cards / tables / modals / tabs / status / empty state | Synthetic nonnumeric query returned two ID-0 rows. No explicit no-result message, sort/filter/pagination observed. P strict syntax, scoped search and friendly no-match. |
 | Notifications / validation / pagination | Common contract; module rules in Module.md; actual DRMS enforcement U unless specifically observed above. |
-| Expected interaction / previous-next navigation | Any shared header → /search/result/{query} → result button UI44; preserve query state in DCMS. |
+| Expected interaction / previous-next navigation | Any shared header → /search/result/{query} → result button UI44; preserve query state in DebtOps. |
 
 <a id="ui44"></a>
 
@@ -837,7 +837,7 @@ Read [Plan.md](Plan.md) for evidence E01–E24 and unresolved G01–G08, [Module
 | Attribute | Specification |
 |---|---|
 | Module / scope / role | M01; C; Public Rider. |
-| Layout / components / mobile | Mobile standalone login with DCMS identity. Shared labels/focus/keyboard/320px rules apply; Admin tables become labelled cards where useful. |
+| Layout / components / mobile | Mobile standalone login with DebtOps identity. Shared labels/focus/keyboard/320px rules apply; Admin tables become labelled cards where useful. |
 | Fields / filters | Email/password/remember; recovery link. |
 | Buttons / actions | Sign in; Logout through account menu. |
 | Validation / states | Shared users/guard; active staff/account + Rider permissions; generic errors/throttle. |
@@ -1016,6 +1016,8 @@ Read [Plan.md](Plan.md) for evidence E01–E24 and unresolved G01–G08, [Module
 
 ## UI59 — Attendance Schedule, Policy and Correction
 
+**M10 approved policy (18 October 2026):** use Module.md#m10-approved-policy. UI33/UI53 show main status plus a separate Late flag/minutes, fixed unpaid break deduction, worked minutes, open/incomplete state and pending-correction indicator. Raw and effective times are visibly distinct. UI59 provides versioned workdays/start/end/break/grace/Present/Half Day/overnight controls, explicit Rider/date-range assignment and day overrides (working/rest/holiday/leave). Correction forms show original/proposed times or calendar type, required justification and independent approve/reject with remarks. No direct punch edit or self-approval. Export uses the identical filters; a printer-friendly report supports Save as PDF without a new PDF dependency. Mobile controls remain >=44px; failed/duplicate punches never show an unpersisted success.
+
 | Attribute | Specification |
 |---|---|
 | Module / scope / role | M10; C; Authorized Admin; independent correction approver. |
@@ -1029,6 +1031,8 @@ Read [Plan.md](Plan.md) for evidence E01–E24 and unresolved G01–G08, [Module
 <a id="ui60"></a>
 
 ## UI60 — Call Centre Workspace
+
+**M11 increment:** sidebar/searchable customer register with customer/name/contact/account/task/category/current Rider filters; selected customer workspace with current phone contacts, optional task picker, current/server vs historical MYT time choice, required historical reason, eight outcomes, Other explanation, PTP context and due follow-up. Show explicit save confirmation, loading/validation/stale/retry states and immutable paginated call/visit timeline. Separate scoped follow-up queue shows due/overdue/completed/cancelled, assignee and source; assigned agents resolve pending call reminders with required remarks/confirmation. Contact-only editor uses the same validation/observation history as customer maintenance and its own permission, without enabling unrelated customer edits. Email/WhatsApp actions remain clearly unavailable until M14; no fabricated message history. Links from customer/task lead to this same workspace. Follow Module.md's M11 backdating/authorization contract.
 
 | Attribute | Specification |
 |---|---|
@@ -1104,8 +1108,8 @@ Read [Plan.md](Plan.md) for evidence E01–E24 and unresolved G01–G08, [Module
 |---|---|
 | Module / scope / role | M14; C; Compose user; template edit/approve separate grants. |
 | Layout / components / mobile | Three option cards and versioned editor/preview; customer context side panel. Shared labels/focus/keyboard/320px rules apply; Admin tables become labelled cards where useful. |
-| Fields / filters | Slots 1–3, subject/body, approved placeholder picker, version/state/approval, selected customer/task context. |
-| Buttons / actions | Select approved; preview; generate letter PDF; save draft/new version; approve/deactivate with permission. |
+| Fields / filters | Slots 1–3, subject/body, approved placeholder picker, version/state/submission/approval/rejection, selected customer/task context. |
+| Buttons / actions | Select approved; preview; generate letter PDF; save draft/new version; submit/approve/reject/archive with permission. |
 | Validation / states | Exactly three logical email options; draft wording blocks sends; allowlisted escaped placeholders; required data errors; no arbitrary Blade execution. |
 | Empty / loading / success / error | Unless detailed above: scoped empty-state explanation and allowed CTA; loading/progress disables duplicate submits; success confirms persisted state/reference; validation/permission/network/stale conflicts preserve safe input with retry or review. Never infer external delivery from queued/accepted. |
 | Navigation / expected interaction | Customer/history → choose → individual preview UI67 or recipients UI66; letter artifact separate from delivery; mobile cards stack. |
@@ -1185,7 +1189,7 @@ Read [Plan.md](Plan.md) for evidence E01–E24 and unresolved G01–G08, [Module
 ### Access and dashboard
 
 ```text
-+--------------------- DCMS / InteXcode ---------------------+
++--------------------- DebtOps / InteXcode ---------------------+
 |                    Sign in                                |
 | Email       [_________________________________]           |
 | Password    [_________________________________] [show]    |
@@ -1194,7 +1198,7 @@ Read [Plan.md](Plan.md) for evidence E01–E24 and unresolved G01–G08, [Module
 | [field error / neutral status message]                    |
 +-----------------------------------------------------------+
 
-+ DCMS ----- scoped search -------- notifications - account +
++ DebtOps ----- scoped search -------- notifications - account +
 | Dashboard   | Home > Dashboard          Assignment [v]     |
 | Assignments | [Total] [Submitted] [Verified] [Outstanding] |
 |  Batches    | Date scope [____]   As of [time / zone]      |
@@ -1258,12 +1262,12 @@ Reviewer controls appear only with permission and valid lifecycle state. Domesti
 
 Every proposed screen needs normal, loading, empty, invalid input, denied, stale session, network failure and concurrency-conflict designs where applicable. Preserve values on failed writes; leave financial operations pending until acknowledged. Save and Submit differ: Save retains draft; Submit requests review. An export request creates a job with a stable snapshot, then produces a separately authorized download.
 
-Confirmed DCMS screens above are implementation scope independently of DRMS. G01–G08 remain reference follow-ups; positive legacy databank, COM DR source detail and source-workbook rules require fixtures, while attendance thresholds, three template contents, domain and provider-qualified calling need activation decisions. A runnable visual prototype is a later implementation artifact; this requested file is the interface inventory and functional prototype specification.
+Confirmed DebtOps screens above are implementation scope independently of DRMS. G01–G08 remain reference follow-ups; positive legacy databank, COM DR source detail and source-workbook rules require fixtures, while attendance thresholds, three template contents, domain and provider-qualified calling need activation decisions. A runnable visual prototype is a later implementation artifact; this requested file is the interface inventory and functional prototype specification.
 
 ### Rider mobile wireframe (C)
 
 ```text
-+ DCMS -- My Tasks ---------------------------+
++ DebtOps -- My Tasks ---------------------------+
 | Today [v]  Search [________]  Filters [v]     |
 | Customer (necessary details only)            |
 | Address / visit time / due / priority        |
@@ -1283,3 +1287,17 @@ Confirmed DCMS screens above are implementation scope independently of DRMS. G01
 ```
 
 Use at least 44px touch targets, single-column data entry, sticky primary action clear of keyboard/safe area, accessible status text and resumable server drafts. No silent offline completion: show connection state, allow retry and verify server receipt. Admin remains desktop/laptop/tablet optimized with responsive smaller-screen fallback.
+
+### M06 approved initial Rider policy — 17 October 2026 (C)
+
+UI22/UI49/UI50 use the owner-approved [M06 master data and purpose policies](Module.md#m06-approved-policy). Add visit purpose, explicit business applicability, signboard-availability declaration and Backdating Reason. All visits require availability/site status/contact result/outcome; applicable business fields and Other explanation are conditional. Typed remarks and due follow-ups stay separate. Display MYT, server-time default and one previous calendar day limit. Preserve safe form input after validation errors.
+
+Keep mobile forms single column with 44px touch targets, grouped optional business/follow-up sections, current task/schedule/context and clear Start/Save/Proof/Checklist actions. UI23 provides camera or gallery, multiple selections, preview/removal, category/caption, progress, scan status and retry. Show HEIC conversion guidance where unsupported; use JPEG/PNG/WebP here. Every proof belongs to the exact saved visit. New visit versions need their own proof; submitted images remain read-only.
+
+UI51 shows the saved visit, typed remarks/business, exact clean images and conditional purpose checks. Link missing requirements to their editor; keep Submit Completion disabled until valid. Confirm frozen data; UI52 displays Pending Verification and immutable receipt/reference. Returned work shows Admin reason and starts a new draft/version. UI48 preserves filters/search, current assignment access and own redacted receipts after reassignment; no customer/proof disclosure to former assignees.
+
+M14 increment 1 / UI65 (18 October 2026): Communications opens three template option cards with draft/approved readiness, current approved version and working draft links. The version editor shows immutable identity, author/approver, subject/body, literal token insertion controls, required-data flags, optimistic conflict feedback and version history. Save draft, create next draft, approve exact saved version and deactivate approved version are permission-controlled, with confirmation on approval/deactivation. Sample preview uses clearly synthetic nonfinancial context; a separate customer-reference search and optional account/task selector produces a freshly scoped personalized saved-content preview. Changing selection clears stale context. Required source-data errors are explicit, including unavailable financial amount/payment due date. Preview remains escaped plain text; drafts never imply delivery readiness. Delivery and letter-artifact actions remain unavailable until the next provider/recipient/private-storage gates.
+
+M14 owner-approved implementation contract (18 October 2026): initial defaults are Friendly Payment Reminder, Outstanding Balance Follow-Up, and Final Follow-Up Notice, using the exact subjects/bodies supplied by the owner in this session. All five registry placeholders are required in these version 1.0 defaults. Preserve text and names in the initial-default seed; no manual client/payment data is invented. Statuses are Draft, Pending Approval, Approved, Rejected, Archived. Drafts are editable with a lock version; submission freezes content for reserved-permission review. Rejection requires a retained reason/reviewer/time; revision creates a new draft. The existing approved version remains active while a replacement is draft, pending or rejected; replacement approval atomically archives the previous approved version. Published and rejected history cannot be rewritten. Generic template approval follows the separate templates.approve grant; no additional self-approval rule is inferred.
+
+Initial approved defaults record approval_source=owner_default and an approval_reference identifying the 18 October 2026 owner authorization, with no fabricated user FK; approved_at records application of this authorized default. Subsequent approvals record the authorized user's approved_by/time. Add name, submitted_by/at, rejected_by/at, encrypted rejection_reason_ciphertext and retained approval-source/reference metadata on the canonical communication_templates table. Seed only missing initial versions and preserve later business edits. Display the initial integer version as 1.0. Explicit synthetic previews may use labeled illustrative amount/date values; those values never enter actual-customer context or any delivery. Actual-customer previews continue to block required financial amount/payment date without approved provenance. Only Approved versions may enter the later recipient/send workflow; current template preview creates no communication or letter artifact.

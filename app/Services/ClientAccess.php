@@ -1,13 +1,13 @@
 <?php
 
-namespace App\Services\Customers;
+namespace App\Services;
 
 use App\Models\Client;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 
 /** No cached portfolio list: every query rechecks effective time-bound grants. */
-class CustomerAccess
+class ClientAccess
 {
     public function clients(User $user): Builder
     {

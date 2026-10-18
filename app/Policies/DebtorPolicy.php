@@ -28,6 +28,11 @@ class DebtorPolicy
         return $this->view($user, $customer) && $user->can('customers.update');
     }
 
+    public function updateContacts(User $user, Debtor $customer): bool
+    {
+        return $this->view($user, $customer) && $user->can('customers.update_contacts');
+    }
+
     public function categorize(User $user, Debtor $customer): bool
     {
         return $this->view($user, $customer) && $user->can('customers.categorize');

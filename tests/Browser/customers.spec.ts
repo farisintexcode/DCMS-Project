@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 test('customer categories create edit search and history work on desktop and small screens', async ({ page }) => {
     const email = process.env.DCMS_E2E_ADMIN_EMAIL;
@@ -13,7 +13,7 @@ test('customer categories create edit search and history work on desktop and sma
     await page.getByLabel('Email', { exact: true }).fill(email!);
     await page.getByLabel('Password', { exact: true }).fill(password!);
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-    await expect(page).toHaveURL(/\/admin$/);
+    await expect(page).toHaveURL(/\/admin$/, { timeout: 90000 });
     await page.goto('/admin/customers/categories');
     await page.getByLabel('Client', { exact: true }).selectOption({ label: 'Synthetic Client' });
     await page.getByLabel('Category code', { exact: true }).fill(category);

@@ -3,6 +3,9 @@
 namespace App\Providers;
 
 use App\Http\Middleware\EnsureActiveAccount;
+use App\Models\CollectionActivity;
+use App\Models\ImportBatch;
+use App\Models\Task;
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
@@ -19,7 +22,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Model::preventLazyLoading(! app()->isProduction());
-        Relation::enforceMorphMap(['user' => User::class]);
+        Relation::enforceMorphMap(['user' => User::class, 'import' => ImportBatch::class, 'task' => Task::class, 'activity' => CollectionActivity::class]);
         Gate::define('use-rider-interface', fn (User $user): bool => $user->canUseRiderInterface());
         Gate::define('viewPulse', fn (User $user): bool => $user->isActive() && $user->can('monitoring.view'));
         Livewire::addPersistentMiddleware([EnsureActiveAccount::class, AuthenticateSession::class]);

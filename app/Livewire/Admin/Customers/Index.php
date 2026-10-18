@@ -4,7 +4,7 @@ namespace App\Livewire\Admin\Customers;
 
 use App\Models\CustomerCategory;
 use App\Models\Debtor;
-use App\Services\Customers\CustomerAccess;
+use App\Services\ClientAccess;
 use App\Services\Customers\CustomerSearch;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -67,7 +67,7 @@ class Index extends Component
     public function render(): View
     {
         Gate::authorize('viewAny', Debtor::class);
-        $access = app(CustomerAccess::class);
+        $access = app(ClientAccess::class);
         $clients = $access->clients(Auth::user())->orderBy('name')->get();
         $query = $access->scope(Debtor::query(), Auth::user())->with(['client', 'categoryAssignments' => fn ($q) => $q->whereNull('revoked_at')->with('category')]);
         foreach (['client_id' => $this->client, 'status' => $this->status, 'party_type' => $this->type] as $field => $value) {

@@ -1,0 +1,2 @@
+@props(['tone' => 'neutral'])
+<span {{ $attributes->class(['badge', 'border-red-200 bg-red-50 text-red-800' => $tone === 'danger', 'border-green-200 bg-green-50 text-green-800' => $tone === 'success', 'border-amber-200 bg-amber-50 text-amber-900' => $tone === 'warning', 'border-ink-200 bg-ink-50 text-ink-600' => $tone === 'neutral', 'border-brand-primary/40 bg-brand-soft text-brand-dark' => $tone === 'brand']) }}>{{ $slot }}</span>

@@ -164,7 +164,7 @@ test('bulk category action applies only explicit selected customers', function (
     $category = CustomerCategory::factory()->for($client)->create();
     $customers = Debtor::factory()->count(3)->for($client)->create();
 
-    Livewire::actingAs($user)->test(Categories::class)->call('members', $category->public_id)->set('selectedCustomers', [$customers[0]->id, $customers[1]->id])->call('applyMemberships')->assertHasNoErrors();
+    Livewire::actingAs($user)->test(Categories::class)->call('members', $category->public_id)->set('selectedCustomers', [$customers[0]->id, $customers[1]->id])->call('applyMemberships')->assertHasNoErrors()->assertSee('Category operation applied to 2 explicitly selected customers.');
 
     $this->assertDatabaseCount('customer_category_assignments', 2);
     $this->assertDatabaseMissing('customer_category_assignments', ['customer_id' => $customers[2]->id]);

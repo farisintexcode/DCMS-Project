@@ -1,6 +1,6 @@
-# DCMS — Functional and Workflow Blueprint
+# DebtOps — Functional and Workflow Blueprint
 
-**Confirmed scope update — 16 October 2026.** The user's confirmed DCMS requirements take precedence over the earlier DRMS parity baseline. **C** means confirmed DCMS capability; **P** denotes an implementation choice within that scope; **O/U** continue to describe only observed/unverified DRMS behaviour. Missing DRMS evidence does not defer Customer Management, automated column mapping, Rider workflows, attendance, Call Centre, email or WhatsApp. Provider selection, template wording and business policy values remain configuration/implementation decisions, not omitted features. See the Feature Coverage Matrix in Plan.md.
+**Confirmed scope update — 16 October 2026.** The user's confirmed DebtOps requirements take precedence over the earlier DRMS parity baseline. **C** means confirmed DebtOps capability; **P** denotes an implementation choice within that scope; **O/U** continue to describe only observed/unverified DRMS behaviour. Missing DRMS evidence does not defer Customer Management, automated column mapping, Rider workflows, attendance, Call Centre, email or WhatsApp. Provider selection, template wording and business policy values remain configuration/implementation decisions, not omitted features. See the Feature Coverage Matrix in Plan.md.
 
 Terminology: **Customer** is the UI/business term for the existing party record in **debtors** (Eloquent **Debtor**); **Rider** is collection staff in **staff**, linked one-to-one to **users**. **Client** remains the commissioning company. Retain these existing physical names and models: do not add parallel customers/customer_contacts/customer_addresses/rider_profiles/task_assignments/attachments/task_verifications tables for the same facts.
 
@@ -8,7 +8,7 @@ InteXcode (IXC) · 16 October 2026 · Baseline for implementation with discovery
 
 ## Reading this blueprint
 
-Evidence IDs E01–E24 and outstanding gaps G01–G08 are defined in [Plan.md](Plan.md). **O** means observed, **P** means proposed, **U** means unverified. Confirmed DCMS behaviours below are marked C; physical implementation choices remain P. Existing O/U statements describe the reference only, not whether confirmed features will be built. A visible Save/Update/Delete control proves availability, not successful server enforcement. No live business records were changed during review.
+Evidence IDs E01–E24 and outstanding gaps G01–G08 are defined in [Plan.md](Plan.md). **O** means observed, **P** means proposed, **U** means unverified. Confirmed DebtOps behaviours below are marked C; physical implementation choices remain P. Existing O/U statements describe the reference only, not whether confirmed features will be built. A visible Save/Update/Delete control proves availability, not successful server enforcement. No live business records were changed during review.
 
 ## Navigation observed in DRMS
 
@@ -197,7 +197,7 @@ UI55 Task Monitoring filters all/unassigned/assigned/in-progress/visited/pending
 
 ### Observed task field dictionary
 
-Names below are source labels, not assertions about DRMS storage. Preserve them in import adapters; normalized DCMS mapping appears in Database.md.
+Names below are source labels, not assertions about DRMS storage. Preserve them in import adapters; normalized DebtOps mapping appears in Database.md.
 
 | Group | Actual labels / fields |
 |---|---|
@@ -285,7 +285,7 @@ stateDiagram-v2
     completed --> in_progress: authorized reopen with audit
 ```
 
-This is the confirmed DCMS lifecycle expressed with existing internal work codes; DRMS's three-option selector remains reference evidence only. Rejection/return and assignment are separate dimensions described in M06.
+This is the confirmed DebtOps lifecycle expressed with existing internal work codes; DRMS's three-option selector remains reference evidence only. Rejection/return and assignment are separate dimensions described in M06.
 
 ### Confirmed completion review contract
 
@@ -343,7 +343,7 @@ task_submissions retains submitted_by, submitted_at and task version; task_revie
 | Forms / fields | O Staff No (IWK Staff ID), Email, Active Status, First Name, Last Name, Gender, Position, Appointment Date, Phone No, Home Phone No, Address. Position values in Plan.md. |
 | Tables / search / buttons | O #/Staff ID/Staff No/Name/Appointment Date/Position/Status; search/sort/pagination, exports, Add/Save/Update/back. |
 | Validation / statuses | O Active/Unactive and Select/Male/Female. P unique staff no and account email, valid email/date, bounded names/contact values; availability check before allocation. Keep display code separate from permission role. |
-| Business rules / workflow | Create staff → invite account P; edit/disable → review outstanding allocations → reassign under authorization. Do not erase staff referenced by history. DRMS attendance fields remain U; confirmed DCMS attendance is specified below. Payroll is outside scope. |
+| Business rules / workflow | Create staff → invite account P; edit/disable → review outstanding allocations → reassign under authorization. Do not erase staff referenced by history. DRMS attendance fields remain U; confirmed DebtOps attendance is specified below. Payroll is outside scope. |
 | Dependencies / related | M01 accounts, M05 allocation, M09 reports, M12 permissions/audit. |
 | Input → processing → output | Staff metadata → validated identity/status update → directory entry, controlled invitation and audit. Attendance uses the confirmed policy/schedule/clock/correction contract below; G08 now concerns policy values, not feature inclusion. |
 
@@ -353,11 +353,19 @@ UI30/31/32 become Rider list/create/edit filters over existing staff; UI54 Rider
 
 ### Attendance management (C)
 
+<a id="m10-approved-policy"></a>
+
+**Owner-approved initial attendance policy — 18 October 2026.** Versioned configurable rules use Monday–Friday, 09:00–18:00 Asia/Kuala_Lumpur, 60 unpaid break minutes per completed interval, 15 inclusive grace minutes, Present at >=420 worked minutes, Half Day at >=240 and <420, and Incomplete below 240. Worked minutes are the completed effective interval less the pinned unpaid break duration, floored at zero; no separate break punches exist in this increment, and no second deduction is applied. The UI identifies this fixed deduction explicitly. Late is a separate flag: clock-in after start+grace is late; late minutes measure arrival after scheduled start. Open intervals remain Open during their shift and Incomplete after its end. Neither a short/open/unscheduled punch nor a pending correction becomes Absent automatically. Absent is only a completed expected schedule with no raw attendance. Rest Day, Public Holiday and Leave are explicit calendar day types; no fabricated punch rows. Pending Correction is an overlay on the existing result until independently decided.
+
+Admin-authorized schedule assignments materialize explicit Rider/date calendar rows, including weekend rest days; no retroactive or universal assignments are invented. Policy versions also support explicit overnight shifts (end on the next local day), different individual assignments, replacement working days and holiday overrides. No overnight schedule is seeded by default. Schedules retain original authorization and corrections retain before/after history; deactivate via an independently approved cancelled-calendar correction rather than deleting referenced history. Separate `attendance.configure`, `attendance.correct` and `attendance.approve_correction` grants control configuration, requests and decisions; no role-name bypass or self-approval, including Admin's own attendance. Riders with `attendance.correct` may request corrections for their own scheduled records only. No supporting attachment is mandatory under this initial policy; private attachment requirements need a separately approved rule. Unscheduled records may be linked to a future reviewed schedule without inventing raw times; until then they remain Needs review.
+
+Raw punches are immutable and server-timestamped, with idempotency keys and one interval per shift; an unresolved raw open interval blocks a new clock-in. Approved effective clock-out closes the operational interval without inventing a raw clock-out. Client-scoped Admin attendance uses a current shared active client grant with the Rider's account; own attendance does not expose client/customer data. CSV and print/PDF views use the same filtered snapshot and safe columns. Payroll, salary deductions, penalties, disciplinary actions, GPS and biometrics are excluded.
+
 | Contract | Behaviour |
 |---|---|
 | Entry / roles / screens | UI53 Rider today/history; UI33 Admin attendance dashboard/list; UI59 schedule/policy/correction dialog. |
 | Rider actions / fields | Clock In, Clock Out, today's server timestamps/status, own date-filtered history and optional remarks. Show business timezone and open shift. |
-| Rules / statuses | One current open interval per Rider, idempotent request keys, clock-out after clock-in. Pin policy/schedule per service date; overnight clock-out stays linked to start-date schedule. Present/Late/Half Day calculated from scheduled start/grace/worked minutes; Absent only expected closed schedule without a punch; Leave from authorized schedule, not guessed. Rules configurable and versioned; thresholds/workdays must be configured before activation. |
+| Rules / statuses | One current open interval per staff member, idempotent request keys, clock-out after clock-in. Pin policy/schedule per service date; overnight clock-out stays linked to start-date schedule. Present/Half Day/Incomplete derive from net worked minutes, with a separate Late flag/minutes; Absent only expected closed schedule without a punch. Leave/Rest Day/Public Holiday come from authorized calendar entries. Rules follow the approved policy above and remain versioned/configurable. |
 | Admin actions | Search/filter Rider/date/status, totals, scoped CSV/PDF; configure schedule/workdays/leave exceptions. Correct request includes reason, original and proposed times/status and a separate authorized approver; reject self-approval. No overwriting raw punches. |
 | Input → processing → output | Server clock event → scope/duplicate/open-shift validation → immutable raw times + effective approved adjustments → own/admin attendance and report projections, audit/notifications. |
 | Tables / dependencies | attendance_policies, attendance_schedules, attendances, attendance_adjustments; existing staff/users/audit/export jobs. No GPS/biometrics required. Missing schedule shows Unscheduled / Needs review, not Absent. |
@@ -394,6 +402,10 @@ flowchart LR
 
 ### Confirmed Call Centre operations
 
+**M11 implementation contract — 18 October 2026:** the owner approved manual call backdating by at most one Asia/Kuala_Lumpur calendar day, with a mandatory reason; current server time remains the default. Future calls are rejected and the original server entry timestamp retained. Call outcomes are the eight confirmed values below in existing reference_values; labels/contact/PTP context are frozen in an encrypted call_details snapshot on collection_activities. Records remain append-only and request UUID replay cannot duplicate calls or reminders. Callback and Promise to Pay require a due follow-up; PTP details are narrative/optional stated date/amount/currency only, never payment posting. Other requires an explanation. Reference metadata.activity_types separates call-only outcomes from site-visit choices and validation; Promise to Pay remains shared. Existing visit references without this metadata retain their approved visit meaning.
+
+Call Centre access requires active Admin workspace access, calls.record, customers.view and effective client scope, without role-name bypass. Necessary phone contacts are visible for manual work; full identifiers remain restricted. Optional tasks must belong to the selected customer/client and require task-view/monitor permissions. Phone/contact changes require the independent customers.update_contacts grant and an optimistic customer revision; append/supersede the existing observations with actor provenance. Follow-ups default to the recording agent. The scoped queue can show call/visit reminders; only the assigned agent can resolve their own pending call reminders with remarks. Done/cancelled decisions retain actor/time/remarks/version and audit; original reminder context is unchanged. Broader reassignment/escalation authority is a later explicit permission contract. No automatic outbound contact is triggered by recording or resolving a call.
+
 **C UI60:** authorized Admin/Call Centre Agent searches Customer/account/task/category/Rider, views necessary debt/task/contact context, records an outgoing telephone call, call time/person/outcome/remarks and follow-up, and sees prior calls plus email/WhatsApp/visit history. Outcomes: Answered, No Answer, Busy, Invalid Number, Call Back Requested, Promise to Pay, Disputed, Other; Other requires detail, Call Back Requested requires follow-up date. Promise to Pay captures notes/optional stated date or amount in context and follow-up; it is not a posted payment or full repayment-plan engine. Contact edits require customers.update_contacts and retain provenance/version.
 
 Call logs reuse collection_activities(type=call), linked to customer, optional task, performed_by and optional communication/voice record. Task-less calls are valid. Follow-ups reuse follow_ups with required customer and optional task. No new duplicate call_logs/whatsapp_messages tables. Actual telephony automation is optional beyond recording manual calls; WhatsApp voice is the separate confirmed integration M14. UI34/35 remain the legacy databank submodule; unknown DRMS databank schema does not block the customer-based Call Centre.
@@ -419,7 +431,7 @@ Call logs reuse collection_activities(type=call), linked to customer, optional t
 
 ### Confirmed operational administration
 
-Admin/Rider permission bundles, customer categories/reference codes, canonical import fields/aliases/profiles, attendance policies/schedules/correction authority and communication template/provider/capability/quota configuration use granular permissions, versioning and audit. UI70 integration settings stores only provider/sender capability and secret reference, never secret contents. Approved production DCMS domain, TLS, APP_URL/session scope and signed webhook routes follow Plan.md#plan-deployment; the reference DRMS domain is unchanged. Existing audit/notification/job tools serve every confirmed module, with own-recipient notices for task assignment/return/approval, import completion, attendance correction and communication job action needed. No automatic customer messaging is triggered merely by a task status change unless a later explicitly configured business rule authorizes it.
+Admin/Rider permission bundles, customer categories/reference codes, canonical import fields/aliases/profiles, attendance policies/schedules/correction authority and communication template/provider/capability/quota configuration use granular permissions, versioning and audit. UI70 integration settings stores only provider/sender capability and secret reference, never secret contents. Approved production DebtOps domain, TLS, APP_URL/session scope and signed webhook routes follow Plan.md#plan-deployment; the reference DRMS domain is unchanged. Existing audit/notification/job tools serve every confirmed module, with own-recipient notices for task assignment/return/approval, import completion, attendance correction and communication job action needed. No automatic customer messaging is triggered merely by a task status change unless a later explicitly configured business rule authorizes it.
 
 ## M13 — Customer Management and categories
 
@@ -446,7 +458,7 @@ Admin/Rider permission bundles, customer categories/reference codes, canonical i
 | Requirement | Functional contract |
 |---|---|
 | Purpose / entry / screens | Customer communication with audit/history. UI64 history, UI65 template selection/editor/approval, UI66 recipients, UI67 personalized preview, UI68 batch result, UI69 WhatsApp conversation, UI70 provider-qualified calling and integration status. Customer/task/Call Centre link to same records. |
-| Three email / letter options | Exactly three logical email slots with immutable approved versions, configurable subject/body. Seed drafts until wording approved. Select approved version; auto-fill customer_name and optionally account_number/outstanding_amount/due_date/company_name. Allowlisted placeholders only, escaped values; missing required value blocks affected recipient. Preview letter/PDF from same template is a document artifact, not an email delivery. |
+| Three email / letter options | Exactly three logical email slots with immutable approved versions, configurable name/subject/body. Seed the owner-approved version 1.0 defaults. Select approved version; auto-fill customer_name and optionally account_number/outstanding_amount/due_date/company_name. Allowlisted placeholders only, escaped values; missing required value blocks affected recipient. Preview letter/PDF from same template is a document artifact, not an email delivery. |
 | Recipient selection / validation | Scoped customer/category/account/task filters or explicit selected contacts; validate email, current preference/suppression and name/task context; deduplicate canonical addresses within batch by explicit one-customer context. Shared address with conflicting personalization requires review; do not merge balances. Show selected/eligible/duplicate/invalid/suppressed counts and reasons. |
 | Preview / confirmation | Preview recipient-specific subject/body and source amount/date/currency, template version and frozen context; review representative and exception rows, view any selected recipient. Confirm exact recipient snapshot/digest; edits invalidate preview. Individual send uses same preview path; no BCC fan-out leaking personal content. |
 | Bulk queue / limit | Configurable initial ~1,000 email recipients/day (KL calendar day), plus actual provider rolling quota/rate. Atomic reservations enforce both across workers. At limit, pause remaining queue with resume time. Raising to ~5,000/day requires quota/tier/rate configuration, not redesigned application. Providers remain adapters. |
@@ -479,10 +491,95 @@ flowchart TD
 
 ## Implementation acceptance checklist
 
-Every module must have an approved role matrix, agreed field dictionary, tested state transitions, accessible validation/empty/error states, scoped exports and audit evidence. DRMS parity claims still require G01–G08; confirmed DCMS features proceed under the C contracts and explicit policy/provider activation checks. Prototype.md defines interface structure; Database.md defines proposed storage. Any new evidence that changes import keys, finance rules, task variants or verification must update all four documents together.
+Every module must have an approved role matrix, agreed field dictionary, tested state transitions, accessible validation/empty/error states, scoped exports and audit evidence. DRMS parity claims still require G01–G08; confirmed DebtOps features proceed under the C contracts and explicit policy/provider activation checks. Prototype.md defines interface structure; Database.md defines proposed storage. Any new evidence that changes import keys, finance rules, task variants or verification must update all four documents together.
 
 ### Context and search consistency requirements
 
-O: global header IWK search navigates to a separate result table; a synthetic nonnumeric query returned two source-ID-0 rows. Internal coercion is an inference, not a verified root cause. P: validate identifier syntax, preserve literal query, require permitted scope and return explicit no-match state. Search rows link to task detail without the full search breadcrumb; DCMS should preserve the query/list state.
+O: global header IWK search navigates to a separate result table; a synthetic nonnumeric query returned two source-ID-0 rows. Internal coercion is an inference, not a verified root cause. P: validate identifier syntax, preserve literal query, require permitted scope and return explicit no-match state. Search rows link to task detail without the full search breadcrumb; DebtOps should preserve the query/list state.
 
-O: an uploaded Vacant detail showed occupancy/meter fields, while a verification-context Vacant detail showed the broad recovery dictionary. P: use one type-aware task renderer with contextual review controls. A dummy-looking source row showed header-like strings in amount/contact fields and malformed dates; treat this as a data-quality finding with unknown origin, and reject header rows, shifted columns and malformed numeric/date values during DCMS intake.
+O: an uploaded Vacant detail showed occupancy/meter fields, while a verification-context Vacant detail showed the broad recovery dictionary. P: use one type-aware task renderer with contextual review controls. A dummy-looking source row showed header-like strings in amount/contact fields and malformed dates; treat this as a data-quality finding with unknown origin, and reject header rows, shifted columns and malformed numeric/date values during DebtOps intake.
+
+<a id="m06-approved-policy"></a>
+
+### M06 approved initial Rider policy — 17 October 2026 (C)
+
+The owner approved the following configurable initial master data. Codes below are DebtOps codes, not inferred mappings of historical DRMS values. Changes require authorized administration; existing accepted submissions pin the exact policy version and choices.
+
+- Availability: Available; Not Available; Temporarily Away; Premises Closed; Unable to Confirm.
+- Site status: Operating; Temporarily Closed; Permanently Closed; Vacant; Relocated; Address Not Found; Access Restricted; Unable to Verify.
+- Contact result: Customer Contacted; Representative Contacted; No Answer; Phone Unreachable; Refused to Engage; Wrong Contact Information; Customer Not Present; Call Back Requested; Unable to Contact.
+- Outcome: Successful Visit; Promise to Pay; Payment Made / Payment Claimed; Follow-Up Required; Customer Disputes Debt; Customer Refused Payment; Customer Not Available; Premises Closed; Customer Relocated; Address Invalid / Not Found; Unable to Complete Visit; Escalation Required.
+- Business type: Sole Proprietorship; Partnership; Private Limited Company; Public Limited Company; Government / Agency; Association / Organization; Individual / Personal; Other.
+- Business nature: Retail; Food & Beverage; Services; Manufacturing; Construction; Logistics / Transportation; Automotive; Healthcare; Education; Professional Services; Technology / IT; Property / Real Estate; Agriculture; Wholesale / Distribution; Other.
+- Business status: Active; Temporarily Suspended; Closed; Relocated; Under Renovation; Unable to Verify; Other. Any Other business selection requires an explanation. Rider explicitly declares business applicability; applicable business visits require all three codes.
+- Proof: Premises / Site Photo; Business Signboard; Customer / Contact Evidence; Supporting Document; Payment Evidence; Other Supporting Evidence. These are new categories alongside preserved legacy street/premise/meter codes.
+
+Visit purpose qualifies the existing assignment type; it does not replace the seven legacy assignment types or invent imported mappings. Initial assignment-type master policy permits the five purposes below; new types require an approved policy. Purpose policies are versioned metadata on reference_values, with authorized configurable per-assignment overrides.
+
+| Visit purpose | Initial mandatory requirements |
+|---|---|
+| Normal Site Visit | At least one Premises / Site Photo; visit remarks; outcome |
+| Address Verification | Premises / Site Photo; site status; signboard photo when available (explicit Rider declaration) |
+| Collection Visit | Premises / Site Photo; visit remarks; outcome; Payment Evidence when payment is recorded/claimed |
+| Payment Verification | Payment Evidence; visit remarks |
+| Customer Not Found / Invalid Address | Premises / surrounding-area photo; site status; detailed visit remarks |
+
+All visits require availability, site status, contact result, outcome and server-recorded submission time. Payment Made / Payment Claimed requires Payment Evidence regardless of purpose and remains an unverified claim, not a receipt or ledger posting. Call Back Requested, Promise to Pay and Follow-Up Required require a due follow-up. Remarks for Collection Visit record the collection discussion separately when supplied; visit remarks remain mandatory.
+
+Time defaults to the current server time. Rider may record actual time today or yesterday in Asia/Kuala_Lumpur, never a future time. A manually selected time before the current local minute requires a Backdating Reason. The limit is one **calendar day**, not a rolling 24 hours. Preserve occurred_at, original created_at and encrypted reason, and append a redacted backdating audit event. Older corrections require a separately authorized future Admin correction workflow; no current Rider override.
+
+Proof images are private S3 objects, linked to both task and exact collection activity, with uploader/server upload timestamp and immutable submitted metadata. Defaults remain 10 MiB/image and ten clean images/submission; validate raster content, decoded dimensions and count, strip unnecessary EXIF and scan fail-closed. JPEG/JPG and PNG are accepted; preserve previously approved WebP support. HEIC is accepted only where a safe decoder is installed; this runtime does not support HEIC and must give clear conversion guidance. No new decoder dependency is implied.
+
+Completion controls stay disabled while required fields, applicable business details, remarks, category counts, signboard declaration or clean scans are missing. Show anchored editor links and the exact saved draft before confirmation. Submit freezes a policy/visit/remarks/business/proof manifest and moves to submitted/pending verification. Retries reuse the same receipt. Only M07 independent approval completes work; return preserves all previous evidence/submissions and enables a new correction draft.
+
+M14 increment 1 implementation contract (18 October 2026): three global logical email slots use stable email_1/email_2/email_3 codes and append-only version history. Draft edits compare lock_version; publishing requires the existing reserved templates.approve grant, preserves approver/time and atomically retires the previous approved version. Editing approved/archived wording creates a new draft version; one draft or pending-review version per slot prevents conflicting parallel draft tracks. Approval permissions follow the documented separate-grant contract; no new role-name shortcut or implicit approver grant is introduced. Template syntax is literal plain text with {{placeholder}} tokens from the five-key registry, never Blade/HTML execution. Required flags may refer only to used tokens. Seeded names/subjects/bodies are the owner-approved version 1.0 defaults below. Generic template access is organization-wide because templates have no client owner; personalized preview additionally requires communications.compose, customers.view and current client scope. company_name explicitly identifies the commissioning Client name; account_number comes from a selected current linked account (or authorized task context). outstanding_amount and payment due_date are unavailable until their approved financial source exists. Missing required data blocks preview and optional missing fields are explicitly listed. UI65 previews saved versions, labels drafts/samples, and records safe preview audit without recipient/body PII. Recipient batches, actual sends, private generated PDFs and WhatsApp services remain subsequent M14 increments, visibly unavailable.
+
+M14 owner-approved implementation contract (18 October 2026): initial defaults are Friendly Payment Reminder, Outstanding Balance Follow-Up, and Final Follow-Up Notice, using the exact subjects/bodies supplied by the owner in this session. All five registry placeholders are required in these version 1.0 defaults. Preserve text and names in the initial-default seed; no manual client/payment data is invented. Statuses are Draft, Pending Approval, Approved, Rejected, Archived. Drafts are editable with a lock version; submission freezes content for reserved-permission review. Rejection requires a retained reason/reviewer/time; revision creates a new draft. The existing approved version remains active while a replacement is draft, pending or rejected; replacement approval atomically archives the previous approved version. Published and rejected history cannot be rewritten. Generic template approval follows the separate templates.approve grant; no additional self-approval rule is inferred.
+
+Initial approved defaults record approval_source=owner_default and an approval_reference identifying the 18 October 2026 owner authorization, with no fabricated user FK; approved_at records application of this authorized default. Subsequent approvals record the authorized user's approved_by/time. Add name, submitted_by/at, rejected_by/at, encrypted rejection_reason_ciphertext and retained approval-source/reference metadata on the canonical communication_templates table. Seed only missing initial versions and preserve later business edits. Display the initial integer version as 1.0. Explicit synthetic previews may use labeled illustrative amount/date values; those values never enter actual-customer context or any delivery. Actual-customer previews continue to block required financial amount/payment date without approved provenance. Only Approved versions may enter the later recipient/send workflow; current template preview creates no communication or letter artifact.
+
+### M14 initial approved wording — owner authorization, 18 October 2026
+
+All five placeholders are required for each initial version 1.0. Subjects and bodies below are literal templates, not executable Blade. Future wording remains configurable through draft → pending approval → approved/rejected, with archived history.
+
+**Option 1 — Friendly Payment Reminder**
+
+Subject: `Payment Reminder for Account {{account_number}}`
+
+```text
+Dear {{customer_name}},
+We hope you are well.
+This is a friendly reminder regarding your account {{account_number}} with {{company_name}}. Our records currently show an outstanding amount of {{outstanding_amount}}, with a due date of {{due_date}}.
+If payment has already been made, please disregard this reminder. Otherwise, we kindly request that you arrange payment or contact us if you require further clarification regarding your account.
+Thank you for your attention to this matter.
+Regards,
+{{company_name}}
+```
+
+**Option 2 — Outstanding Balance Follow-Up**
+
+Subject: `Follow-Up on Outstanding Balance — Account {{account_number}}`
+
+```text
+Dear {{customer_name}},
+We are following up regarding the outstanding balance associated with account {{account_number}} under {{company_name}}.
+As of this notice, the outstanding amount is {{outstanding_amount}} and the recorded due date is {{due_date}}.
+Please review the account details and arrange payment as soon as possible. If you have already made payment or believe the information is incorrect, please contact the appropriate representative so that the account can be reviewed.
+We appreciate your cooperation and prompt attention.
+Regards,
+{{company_name}}
+```
+
+**Option 3 — Final Follow-Up Notice** (Final Follow-Up / Action Required)
+
+Subject: `Action Required: Outstanding Account {{account_number}}`
+
+```text
+Dear {{customer_name}},
+This message is a further follow-up regarding account {{account_number}} with {{company_name}}.
+The account currently reflects an outstanding amount of {{outstanding_amount}}, with a due date of {{due_date}}.
+Please arrange payment or contact us promptly to discuss the account status. If payment has already been completed or the account details require clarification, please notify us so that the matter can be reviewed accordingly.
+This notice is intended to ensure that the account receives the necessary attention and follow-up.
+Regards,
+{{company_name}}
+```

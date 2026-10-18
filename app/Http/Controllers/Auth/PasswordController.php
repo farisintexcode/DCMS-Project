@@ -59,6 +59,9 @@ class PasswordController extends Controller
                     if ($user->status !== ($activation ? AccountStatus::Invited : AccountStatus::Active) || ($user->staff_id && ! $user->staff()->where('is_active', true)->exists())) {
                         throw ValidationException::withMessages(['email' => 'This recovery link cannot be used.']);
                     }
+                    if ($activation && $user->staff_id && ! $user->staff()->whereRaw('lower(email) = ?', [$user->email])->exists()) {
+                        throw ValidationException::withMessages(['email' => 'This invitation no longer matches the staff record. Ask for a new invitation.']);
+                    }
                     $user->password = $password;
                     $user->remember_token = Str::random(60);
                     if ($activation) {

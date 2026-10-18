@@ -1,0 +1,120 @@
+<?php
+
+namespace App\Actions\Staff;
+
+use App\Enums\AccountStatus;
+use App\Models\Staff;
+use App\Models\User;
+use App\Notifications\StaffInvitation;
+use App\Services\AuditWriter;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+
+/** UI31/32 separate account action: users.invite; Admin additionally requires roles.manage. */
+class InviteStaffAccount
+{
+    public function __construct(private AuditWriter $audit) {}
+
+    public function handle(User $actor, Staff $target, string $role, string $revision): string
+    {
+        $delivery = 'prepared';
+        try {
+            DB::transaction(function () use ($actor, $target, $role, $revision, &$delivery): void {
+                $staff = Staff::query()->lockForUpdate()->findOrFail($target->id);
+                Gate::forUser($actor)->authorize('invite', $staff);
+                if (! hash_equals($staff->revision(), $revision)) {
+                    throw ValidationException::withMessages(['invitation' => 'This staff record changed. Reload before inviting.']);
+                }
+                if (! config('dcms.terms_version') || ! config('dcms.privacy_url')) {
+                    throw ValidationException::withMessages(['invitation' => 'Configure the approved terms version and privacy URL before issuing invitations.']);
+                }
+                if (! $staff->is_active || ! $staff->email || ! filter_var($staff->email, FILTER_VALIDATE_EMAIL)) {
+                    throw ValidationException::withMessages(['invitation' => 'An active staff member with a valid employment email is required.']);
+                }
+                Validator::make(['role' => $role], ['role' => ['required', 'in:Admin,Rider']])->validate();
+                if ($role === 'Admin') {
+                    Gate::forUser($actor)->authorize('roles.manage');
+                } elseif (! $staff->is_rider) {
+                    throw ValidationException::withMessages(['invitation' => 'Rider access requires active Rider eligibility.']);
+                }
+                $account = $staff->user()->first();
+                if ($account) {
+                    DB::table('password_reset_tokens')->where('email', $account->email)->lockForUpdate()->first();
+                    $account = User::query()->lockForUpdate()->findOrFail($account->id);
+                    if ($account->status !== AccountStatus::Invited) {
+                        throw ValidationException::withMessages(['invitation' => 'This account already exists. Use its approved account recovery or administration process.']);
+                    }
+                    if ($account->getRoleNames()->sort()->values()->all() !== [$role] || $account->getDirectPermissions()->isNotEmpty()) {
+                        throw ValidationException::withMessages(['invitation' => 'Reissuing cannot change permissions. Use authorized identity administration.']);
+                    }
+                    if (Password::getRepository()->recentlyCreatedToken($account)) {
+                        throw ValidationException::withMessages(['invitation' => 'An invitation was issued recently. Wait before reissuing it.']);
+                    }
+                }
+                $email = mb_strtolower(trim($staff->email));
+                if (User::query()->whereRaw('lower(email) = ?', [$email])->when($account, fn ($q) => $q->whereKeyNot($account->id))->exists()) {
+                    throw ValidationException::withMessages(['invitation' => 'This email already belongs to another account. Existing identities are never merged.']);
+                }
+                if ($account && $account->email !== $email) {
+                    DB::table('password_reset_tokens')->where('email', $account->email)->delete();
+                }
+                $account ??= new User;
+                $newAccount = ! $account->exists;
+                $account->staff_id = $staff->id;
+                $account->email = $email;
+                $account->name = Str::limit($staff->full_name, 160, '');
+                $account->status = AccountStatus::Invited;
+                $account->password = Str::random(64);
+                $account->save();
+                if ($newAccount) {
+                    $account->assignRole($role);
+                }
+                $token = Password::createToken($account);
+                $this->audit->record($actor, 'account_invitation_prepared', $staff->public_id,
+                    ['status' => 'invited', 'role' => $role], module: 'M10', entityType: 'staff');
+                DB::afterCommit(function () use ($account, $token, &$delivery): void {
+                    if ($this->usesLogTransport(config('mail.default'))) {
+                        $delivery = 'unsafe_transport';
+
+                        return;
+                    }
+                    try {
+                        $account->notify(new StaffInvitation($token));
+                        $delivery = config('mail.default') === 'array' ? 'local_capture' : 'mail_accepted';
+                    } catch (\Throwable $exception) {
+                        $delivery = 'delivery_failed';
+                        Log::warning('Staff invitation mail transport failed.', ['user_id' => $account->public_id, 'exception_type' => $exception::class]);
+                    }
+                });
+            }, 3);
+        } catch (UniqueConstraintViolationException) {
+            throw ValidationException::withMessages(['invitation' => 'This staff member or email already has an account. Reload and review.']);
+        }
+
+        return $delivery;
+    }
+
+    private function usesLogTransport(string $name, array $seen = []): bool
+    {
+        if (in_array($name, $seen, true)) {
+            return true;
+        }
+        $seen[] = $name;
+        if (config('mail.mailers.'.$name.'.transport') === 'log') {
+            return true;
+        }
+        foreach (config('mail.mailers.'.$name.'.mailers', []) as $child) {
+            if ($this->usesLogTransport($child, $seen)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}

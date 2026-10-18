@@ -147,10 +147,10 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 </laravel-boost-guidelines>
 
-# DCMS requirements authority
+# DebtOps requirements authority
 
 Before implementing any module, screen, relationship, validation or integration, read the applicable sections of root Plan.md, Module.md, Prototype.md and Database.md. These four files are the single source of truth. Confirmed C scope takes precedence over historical DRMS O/U evidence. Record traceability by module/interface/table in code and PR descriptions. Highlight technical conflicts before changing behaviour; see docs/foundation-review.md for known findings.
 
-Build DCMS by InteXcode in the Plan.md dependency order. Keep Customer on debtors/Debtor and Rider on staff/users. Never introduce duplicate customer/rider/task assignment/evidence entities. Use PostgreSQL in tests, UTC persistence, business timezone Asia/Kuala_Lumpur, Laravel 13, Livewire 4, Blade, Tailwind 4 and Livewire's bundled Alpine. Use Pest with PHPUnit underneath and Playwright for browser coverage as explicitly requested by the user. Apply permissions plus effective client scope and record policies; no role-name bypass. No seeded passwords, fabricated financial receipts or assumed attendance rules.
+Build DebtOps by InteXcode in the Plan.md dependency order. Keep Customer on debtors/Debtor and Rider on staff/users. Never introduce duplicate customer/rider/task assignment/evidence entities. Use PostgreSQL in tests, UTC persistence, business timezone Asia/Kuala_Lumpur, Laravel 13, Livewire 4, Blade, Tailwind 4 and Livewire's bundled Alpine. Use Pest with PHPUnit underneath and Playwright for browser coverage as explicitly requested by the user. Apply permissions plus effective client scope and record policies; no role-name bypass. No seeded passwords, fabricated financial receipts or assumed attendance rules.
 
 The first increment provides identity/scopes/audit/outbox persistence and shells. Customer CRUD is next. No production deployment, external messaging or provider activation is configured. Docker/WSL validation remains a required local integration gate.

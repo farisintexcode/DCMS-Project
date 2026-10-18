@@ -1,0 +1,81 @@
+import { expect, test } from './fixtures';
+
+test('Rider clocks a real shift, requests correction and Admin independently approves it', async ({page}) => {
+    test.setTimeout(240000);
+    const password=process.env.DCMS_E2E_PASSWORD;
+    const admin=process.env.DCMS_E2E_ADMIN_EMAIL;
+    test.skip(!password || !admin, 'Requires disposable synthetic attendance fixtures.');
+    const surface=test.info().project.name;
+    const localDate=(offset=0)=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kuala_Lumpur',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(Date.now()+offset*86400000));
+    const errors:string[]=[];
+    page.on('pageerror',error=>errors.push(error.message));
+    page.on('dialog',dialog=>dialog.accept());
+    await page.goto('/rider/login');
+    await page.getByLabel('Email',{exact:true}).fill('attendance-'+surface+'@example.test');
+    await page.getByLabel('Password',{exact:true}).fill(password!);
+    await page.getByRole('button',{name:'Sign in',exact:true}).click();
+    await expect(page).toHaveURL(/\/rider$/,{timeout:90000});
+    await page.goto('/rider/attendance');
+    await expect(page.getByRole('heading',{name:'Your attendance',exact:true,level:1})).toBeVisible();
+    await page.getByLabel('Shift remark (optional)',{exact:true}).fill('Synthetic browser field shift');
+    await page.getByRole('button',{name:'Clock In',exact:true}).click();
+    await expect(page.getByRole('status').filter({hasText:'Clock in saved at'})).toBeVisible({timeout:30000});
+    await page.getByRole('button',{name:'Clock Out',exact:true}).click();
+    await expect(page.getByRole('status').filter({hasText:'Clock out saved at'})).toBeVisible({timeout:30000});
+    await expect(page.getByRole('button',{name:'Clock In',exact:true})).toHaveCount(0);
+    await page.getByLabel('History from',{exact:true}).fill(localDate(-3));
+    await page.getByRole('button',{name:'View history',exact:true}).click();
+    const historical=page.locator('article').filter({hasText:localDate(-2)});
+    await historical.getByRole('button',{name:'Request correction',exact:true}).click();
+    if(surface==='rider-mobile'){
+        for(const width of [320,430]){
+            await page.setViewportSize({width,height:900});
+            expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();
+            for(const input of await page.locator('input[type="datetime-local"]').all()){
+                const box=await input.boundingBox();
+                expect(box!.x).toBeGreaterThanOrEqual(0);
+                expect(box!.x+box!.width).toBeLessThanOrEqual(width+1);
+            }
+        }
+        await page.setViewportSize({width:375,height:667});
+    }
+    await page.getByLabel('Requested clock out (MYT)',{exact:true}).fill(localDate(-2)+'T18:00');
+    await page.getByLabel('Correction reason',{exact:true}).fill('Synthetic correction '+surface);
+    await page.getByRole('button',{name:'Submit correction request',exact:true}).click();
+    await expect(page.getByRole('status').filter({hasText:'Correction requested.'})).toBeVisible();
+    await expect(historical.getByText('Pending Correction',{exact:true})).toBeVisible();
+    await page.screenshot({path:'.local-tools/m10-'+surface+'-rider.png',fullPage:true});
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();
+    await page.getByRole('button',{name:'Sign out',exact:true}).first().click();
+    await page.goto('/login');
+    await page.getByLabel('Email',{exact:true}).fill(admin!);
+    await page.getByLabel('Password',{exact:true}).fill(password!);
+    await page.getByRole('button',{name:'Sign in',exact:true}).click();
+    await expect(page).toHaveURL(/\/admin$/,{timeout:90000});
+    await page.goto('/admin/attendance');
+    await page.getByLabel('Service date from',{exact:true}).fill(localDate(-3));
+    await page.getByLabel('Attendance status',{exact:true}).selectOption('pending_correction');
+    await page.getByLabel('Rider name or staff number',{exact:true}).fill('ATT-'+surface.toUpperCase());
+    await page.getByRole('button',{name:'Apply filters',exact:true}).click();
+    await expect(page.getByRole('link',{name:'View attendance',exact:true})).toHaveCount(1);
+    await page.getByRole('link',{name:'View attendance',exact:true}).click();
+    await expect(page.getByText('Synthetic correction '+surface,{exact:true})).toBeVisible();
+    await page.getByLabel('Reviewer remarks',{exact:true}).fill('Independent synthetic check');
+    await page.getByRole('button',{name:'Approve correction',exact:true}).click();
+    await expect(page.getByRole('status').filter({hasText:'Correction approved.'})).toBeVisible();
+    await expect(page.getByText('Worked 480 min',{exact:false})).toBeVisible();
+    await page.screenshot({path:'.local-tools/m10-'+surface+'-review.png',fullPage:true});
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();
+    await page.goto('/admin/attendance/configuration');
+    await page.getByLabel('Policy code',{exact:true}).fill('ui-'+surface+'-'+Date.now());
+    await page.getByRole('button',{name:'Publish approved version',exact:true}).click();
+    await expect(page.getByRole('status').filter({hasText:'published.'})).toBeVisible();
+    await page.getByLabel('Rider to schedule',{exact:true}).selectOption({label:'ATT-'+surface.toUpperCase()+' · Attendance '+surface});
+    await page.getByLabel('Assign from',{exact:true}).fill(localDate(1));
+    await page.getByLabel('Assign through',{exact:true}).fill(localDate(1));
+    await page.getByRole('button',{name:'Confirm calendar assignment',exact:true}).click();
+    await expect(page.getByRole('status').filter({hasText:'1 calendar days assigned.'})).toBeVisible();
+    await page.screenshot({path:'.local-tools/m10-'+surface+'-calendar.png',fullPage:true});
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();
+    expect(errors).toEqual([]);
+});

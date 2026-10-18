@@ -1,0 +1,91 @@
+<?php
+
+namespace App\Actions\Assignments;
+
+use App\Enums\BatchStatus;
+use App\Models\AssignmentBatch;
+use App\Models\Client;
+use App\Models\User;
+use App\Services\Assignments\BatchWork;
+use App\Services\AuditWriter;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+
+/** Plan.md M03 / Module.md M03 / UI11–12 / assignment_batches. */
+class SaveAssignmentBatch
+{
+    public function __construct(private AuditWriter $audit, private BatchWork $work) {}
+
+    public function handle(User $actor, array $input, ?AssignmentBatch $existing = null, ?int $version = null): AssignmentBatch
+    {
+        try {
+            return DB::transaction(function () use ($actor, $input, $existing, $version): AssignmentBatch {
+                $clientId = $existing?->client_id ?? (is_scalar($input['client_id'] ?? null) ? filter_var($input['client_id'], FILTER_VALIDATE_INT) : 0);
+                $client = Client::query()->lockForUpdate()->findOrFail($clientId ?: 0);
+                abort_unless($actor->hasClientScope($client), 404);
+                $batch = $existing ? AssignmentBatch::query()->lockForUpdate()->findOrFail($existing->id) : new AssignmentBatch;
+                Gate::forUser($actor)->authorize($existing ? 'update' : 'create', $existing ? $batch : [AssignmentBatch::class, $client]);
+                if ($existing && ($version === null || $batch->lock_version !== $version)) {
+                    throw ValidationException::withMessages(['version' => 'This assignment changed. Reload and review before saving.']);
+                }
+                if ($existing && $batch->status !== BatchStatus::Active) {
+                    throw ValidationException::withMessages(['status' => 'Archived assignments are read-only. Reopen under authorization first.']);
+                }
+                if (isset($input['client_id']) && (! is_scalar($input['client_id']) || (string) $input['client_id'] !== (string) $client->id)) {
+                    throw ValidationException::withMessages(['data.client_id' => 'The assignment client cannot be changed.']);
+                }
+                foreach (['name', 'external_reference', 'description', 'dca_code', 'dca_name', 'la_name', 'state_code'] as $field) {
+                    if (is_string($input[$field] ?? null)) {
+                        $input[$field] = trim($input[$field]);
+                        if ($input[$field] === '' && $field !== 'name') {
+                            $input[$field] = null;
+                        }
+                    }
+                }
+                $rules = [
+                    'name' => ['required', 'string', 'max:200'],
+                    'external_reference' => ['nullable', 'string', 'max:100', Rule::unique('assignment_batches')->where('client_id', $client->id)->ignore($batch->id)],
+                    'start_date' => ['required', 'date_format:Y-m-d'],
+                    'due_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:start_date'],
+                    'description' => ['nullable', 'string', 'max:5000'],
+                    'dca_code' => ['nullable', 'string', 'max:50'], 'dca_name' => ['nullable', 'string', 'max:200'], 'la_name' => ['nullable', 'string', 'max:200'],
+                ];
+                foreach (['type_code' => 'assignment_type', 'state_code' => 'state'] as $field => $category) {
+                    $rules[$field] = [$field === 'type_code' ? 'required' : 'nullable', 'string', 'max:64', Rule::exists('reference_values', 'code')->where('category', $category)->where(fn ($q) => $q->when(! $batch->exists || ($input[$field] ?? null) !== $batch->{$field}, fn ($q) => $q->where('is_active', true)))];
+                }
+                $validator = Validator::make($input, $rules);
+                if ($validator->fails()) {
+                    throw ValidationException::withMessages(collect($validator->errors()->toArray())->mapWithKeys(fn ($messages, $key) => ['data.'.$key => $messages])->all());
+                }
+                $data = $validator->validated();
+                if ($existing && $batch->type_code !== $data['type_code']) {
+                    $work = $this->work->summary($batch);
+                    if (($work['tasks'] ?? 0) + ($work['imports'] ?? 0) > 0) {
+                        throw ValidationException::withMessages(['data.type_code' => 'Type cannot change after task or import history exists. Create a separate work package.']);
+                    }
+                }
+                foreach ($data as $field => $value) {
+                    $batch->{$field} = $value;
+                }
+                $batch->client_id = $client->id;
+                if (! $existing) {
+                    $batch->created_by = $actor->id;
+                    $batch->status = BatchStatus::Active;
+                    $batch->lock_version = 0;
+                } else {
+                    $batch->lock_version++;
+                }
+                $batch->save();
+                $this->audit->record($actor, $existing ? 'assignment_updated' : 'assignment_created', $batch->public_id, ['status' => 'active', 'changed_fields' => array_keys($data)], module: 'M03', entityType: 'assignment_batch');
+
+                return $batch->refresh();
+            }, 3);
+        } catch (UniqueConstraintViolationException) {
+            throw ValidationException::withMessages(['data.external_reference' => 'This client already has an assignment with that external reference.']);
+        }
+    }
+}

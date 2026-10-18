@@ -1,0 +1,76 @@
+import { expect, test } from './fixtures';
+
+test('template manager previews approved defaults and reviews replacement history without sending',async({page})=>{
+    test.setTimeout(240000);
+    const password=process.env.DCMS_E2E_PASSWORD;
+    const admin=process.env.DCMS_E2E_ADMIN_EMAIL;
+    test.skip(!password || !admin,'Requires isolated synthetic template fixtures.');
+    const surface=test.info().project.name;
+    const slot=surface==='desktop'?1:2;
+    const errors:string[]=[];
+    page.on('pageerror',error=>errors.push(error.message));
+    page.on('dialog',dialog=>dialog.accept());
+    await page.goto('/login');
+    await page.getByLabel('Email',{exact:true}).fill(admin!);
+    await page.getByLabel('Password',{exact:true}).fill(password!);
+    await page.getByRole('button',{name:'Sign in',exact:true}).click();
+    await expect(page).toHaveURL(/\/admin$/,{timeout:90000});
+    await page.goto('/admin/communications');
+    await expect(page.getByRole('heading',{name:'Communications',exact:true,level:1})).toBeVisible();
+    await page.getByRole('link',{name:'View approved option '+slot,exact:true}).click();
+    await expect(page.getByText('Version 1.0 · Approved',{exact:true})).toBeVisible();
+    await page.getByRole('button',{name:'Preview with sample identity',exact:true}).click();
+    await expect(page.getByRole('heading',{name:'Sample preview',exact:true})).toBeVisible();
+    await expect(page.getByText(/Dear Sample Customer/)).toBeVisible();
+    await page.getByLabel('Exact customer reference',{exact:true}).fill('RIDER-'+surface.toUpperCase());
+    await page.getByRole('button',{name:'Find accessible customer',exact:true}).click();
+    await page.getByLabel('Account context (optional)',{exact:true}).selectOption({label:'M06-'+surface.toUpperCase()});
+    await page.getByRole('button',{name:'Preview for selected customer',exact:true}).click();
+    await expect(page.getByText(/Required source data unavailable: outstanding_amount, due_date/)).toBeVisible();
+    await page.getByRole('button',{name:'Create / open next draft',exact:true}).click();
+    await expect(page.getByText('Version 2.0 · Draft',{exact:true})).toBeVisible();
+    await page.getByLabel('Template name',{exact:true}).fill('Synthetic '+surface+' notice');
+    await page.getByLabel('Email subject',{exact:true}).fill('Synthetic '+surface+' for {{customer_name}}');
+    await page.getByLabel('Message / letter body',{exact:true}).fill('Hello {{customer_name}}, account {{account_number}}, from {{company_name}}.');
+    await page.getByLabel('Outstanding amount from approved financial source',{exact:true}).uncheck();
+    await page.getByLabel('Payment due date from approved financial source',{exact:true}).uncheck();
+    await page.getByRole('button',{name:'Save draft',exact:true}).click();
+    await expect(page.getByRole('status').filter({hasText:'Draft saved.'})).toBeVisible();
+    await page.getByRole('button',{name:'Preview with sample identity',exact:true}).click();
+    await expect(page.getByRole('heading',{name:'Sample preview',exact:true})).toBeVisible();
+    await page.getByLabel('Exact customer reference',{exact:true}).fill('RIDER-'+surface.toUpperCase());
+    await page.getByRole('button',{name:'Find accessible customer',exact:true}).click();
+    await page.getByLabel('Account context (optional)',{exact:true}).selectOption({label:'M06-'+surface.toUpperCase()});
+    await page.getByRole('button',{name:'Preview for selected customer',exact:true}).click();
+    await expect(page.getByRole('heading',{name:'Personalized preview',exact:true})).toBeVisible();
+    await expect(page.getByText('Hello Synthetic Field Customer '+surface+', account M06-'+surface.toUpperCase()+', from Synthetic Client.',{exact:true})).toBeVisible();
+    if(surface==='rider-mobile'){
+        for(const width of [320,430]){
+            await page.setViewportSize({width,height:900});
+            expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();
+        }
+        await page.setViewportSize({width:375,height:667});
+    }
+    await page.screenshot({path:'.local-tools/m14-'+surface+'-studio.png',fullPage:true});
+    await page.getByRole('button',{name:'Submit for approval',exact:true}).click();
+    await expect(page.getByRole('status').filter({hasText:'Template submitted for approval.'})).toBeVisible();
+    await expect(page.getByRole('heading',{name:'Saved wording',exact:true})).toBeVisible();
+    await page.getByLabel('Rejection reason',{exact:true}).fill('Synthetic legal review '+surface);
+    await page.getByRole('button',{name:'Reject submitted version',exact:true}).click();
+    await expect(page.getByRole('status').filter({hasText:'Template rejected.'})).toBeVisible();
+    await page.getByRole('button',{name:'Create / open next draft',exact:true}).click();
+    await expect(page.getByText('Version 3.0 · Draft',{exact:true})).toBeVisible();
+    await page.getByLabel('Message / letter body',{exact:true}).fill('Revised message for {{customer_name}} and account {{account_number}}.');
+    await page.getByLabel('Commissioning client name',{exact:true}).uncheck();
+    await page.getByRole('button',{name:'Save draft',exact:true}).click();
+    await expect(page.getByRole('status').filter({hasText:'Draft saved.'})).toBeVisible();
+    await page.getByRole('button',{name:'Submit for approval',exact:true}).click();
+    await expect(page.getByRole('status').filter({hasText:'Template submitted for approval.'})).toBeVisible();
+    await page.getByRole('button',{name:'Approve saved version',exact:true}).click();
+    await expect(page.getByRole('status').filter({hasText:'Saved template version approved.'})).toBeVisible();
+    await expect(page.getByText('Archived',{exact:true})).toBeVisible();
+    await page.getByRole('button',{name:'Archive approved version',exact:true}).click();
+    await expect(page.getByRole('status').filter({hasText:'Template version archived.'})).toBeVisible();
+    await page.screenshot({path:'.local-tools/m14-'+surface+'-history.png',fullPage:true});
+    expect(errors).toEqual([]);
+});

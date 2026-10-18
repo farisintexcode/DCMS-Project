@@ -2,7 +2,7 @@
     "$schema": "https://getcomposer.org/schema.json",
     "name": "intexcode/dcms",
     "type": "project",
-    "description": "Debt Collector Management System by InteXcode.",
+    "description": "DebtOps — Debt Collection Management System by InteXcode.",
     "keywords": ["laravel", "framework"],
     "license": "MIT",
     "require": {
@@ -12,6 +12,7 @@
         "laravel/tinker": "^3.0",
         "league/flysystem-aws-s3-v3": "^3.0",
         "livewire/livewire": "^4.0",
+        "phpoffice/phpspreadsheet": "^5.10",
         "predis/predis": "^3.0",
         "sentry/sentry-laravel": "^4.0",
         "spatie/laravel-permission": "^8.0"

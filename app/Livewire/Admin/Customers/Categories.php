@@ -7,7 +7,7 @@ use App\Actions\Customers\SyncCustomerCategories;
 use App\Models\Client;
 use App\Models\CustomerCategory;
 use App\Models\Debtor;
-use App\Services\Customers\CustomerAccess;
+use App\Services\ClientAccess;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -53,7 +53,7 @@ class Categories extends Component
     public function members(string $publicId): void
     {
         abort_unless(Auth::user()->can('customers.categorize') && Auth::user()->can('customers.view'), 403);
-        $category = app(CustomerAccess::class)->scope(CustomerCategory::query(), Auth::user())->where('public_id', $publicId)->firstOrFail();
+        $category = app(ClientAccess::class)->scope(CustomerCategory::query(), Auth::user())->where('public_id', $publicId)->firstOrFail();
         $this->membershipCategoryId = $category->id;
         $this->reset('selectedCustomers', 'selectionVersions', 'memberReference');
     }
@@ -61,7 +61,7 @@ class Categories extends Component
     public function updatedSelectedCustomers(): void
     {
         $this->validate(['selectedCustomers' => ['array', 'max:50'], 'selectedCustomers.*' => ['integer', 'distinct']]);
-        $category = app(CustomerAccess::class)->scope(CustomerCategory::query(), Auth::user())->findOrFail($this->membershipCategoryId);
+        $category = app(ClientAccess::class)->scope(CustomerCategory::query(), Auth::user())->findOrFail($this->membershipCategoryId);
         $customers = Debtor::query()->where('client_id', $category->client_id)->whereIn('id', $this->selectedCustomers)->get();
         abort_unless($customers->count() === count($this->selectedCustomers), 404);
         $versions = [];
@@ -76,7 +76,7 @@ class Categories extends Component
         abort_unless(Auth::user()->can('customers.categorize') && Auth::user()->can('customers.view'), 403);
         $this->validate(['selectedCustomers' => ['required', 'array', 'min:1', 'max:50'], 'selectedCustomers.*' => ['integer', 'distinct'], 'membershipOperation' => ['required', 'in:assign,revoke']]);
         DB::transaction(function () use ($sync): void {
-            $category = app(CustomerAccess::class)->scope(CustomerCategory::query(), Auth::user())->findOrFail($this->membershipCategoryId);
+            $category = app(ClientAccess::class)->scope(CustomerCategory::query(), Auth::user())->findOrFail($this->membershipCategoryId);
             Client::query()->lockForUpdate()->findOrFail($category->client_id);
             $customers = Debtor::query()->with('client')->where('client_id', $category->client_id)->whereIn('id', $this->selectedCustomers)->orderBy('id')->lockForUpdate()->get();
             abort_unless($customers->count() === count($this->selectedCustomers), 404);
@@ -97,7 +97,7 @@ class Categories extends Component
 
     public function edit(string $publicId): void
     {
-        $category = app(CustomerAccess::class)->scope(CustomerCategory::query(), Auth::user())->where('public_id', $publicId)->with('client')->firstOrFail();
+        $category = app(ClientAccess::class)->scope(CustomerCategory::query(), Auth::user())->where('public_id', $publicId)->with('client')->firstOrFail();
         Gate::authorize('update', $category);
         $this->categoryId = $category->id;
         $this->revision = $category->revision();
@@ -131,7 +131,7 @@ class Categories extends Component
         if ($this->membershipCategoryId) {
             abort_unless(Auth::user()->can('customers.view') && Auth::user()->can('customers.categorize'), 403);
         }
-        $access = app(CustomerAccess::class);
+        $access = app(ClientAccess::class);
         $query = $access->scope(CustomerCategory::query(), Auth::user())->with('client')->withCount(['categoryAssignments as current_members' => fn ($q) => $q->whereNull('revoked_at')]);
         if ($this->client !== '') {
             $query->where('client_id', (int) $this->client);

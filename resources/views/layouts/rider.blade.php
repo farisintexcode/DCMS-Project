@@ -1,15 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>@include('partials.head')</head>
-<body class="min-h-dvh bg-slate-50 text-slate-900 antialiased">
+<body class="workspace-canvas text-brand-dark antialiased rider-workspace" x-data="dcmsWorkspace('rider')" :class="{ 'drawer-open': menuOpen && !desktop }" @resize.window="resize()" @keydown.escape.window="if (menuOpen) closeMenu()" @keydown.window="trap($event)">
 <a href="#main-content" class="sr-only focus:not-sr-only">Skip to content</a>
-<header class="border-b border-slate-200 bg-white px-5 py-4"><div class="mx-auto flex max-w-2xl items-center justify-between gap-4"><x-brand /><form method="POST" action="{{ route('logout') }}">@csrf<button type="submit" class="min-h-11 text-sm text-slate-600 underline">Sign out</button></form></div></header>
-<main id="main-content" class="mx-auto grid max-w-2xl gap-6 px-5 pt-7 pb-32"><x-feedback />{{ $slot }}</main>
-<nav aria-label="Rider navigation" class="fixed inset-x-0 bottom-0 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]"><div class="mx-auto grid max-w-2xl grid-cols-4 text-center text-xs">
-    <a href="{{ route('rider.home') }}" class="grid min-h-16 place-items-center px-1 font-semibold text-teal-800">Home</a>
-    <span aria-disabled="true" class="grid min-h-16 place-items-center px-1 text-slate-400">My Tasks<br>Planned</span>
-    <span aria-disabled="true" class="grid min-h-16 place-items-center px-1 text-slate-400">Attendance<br>Planned</span>
-    <a href="{{ route('account.settings') }}" class="grid min-h-16 place-items-center px-1 font-semibold text-teal-800">Account</a>
+<header :inert="menuOpen && !desktop" class="border-b border-ink-200 bg-white px-4 py-5"><div class="mx-auto flex max-w-2xl items-center justify-between gap-3"><div class="flex items-center gap-2"><button x-ref="menuToggle" type="button" aria-label="Menu" aria-controls="rider-navigation" :aria-expanded="menuOpen" @click="openMenu()" class="grid size-11 shrink-0 place-items-center rounded-xl border border-ink-200 lg:hidden"><x-icon name="menu" /></button><x-brand compact class="header-brand" /></div><div class="flex items-center gap-2"><x-theme-toggle /><form method="POST" action="{{ route('logout') }}">@csrf<button type="submit" class="flex min-h-11 items-center gap-2 whitespace-nowrap text-xs text-ink-600"><x-icon name="logout" class="size-4" />Sign out</button></form></div></div></header><x-sidebar portal="rider" />
+<main :inert="menuOpen && !desktop" id="main-content" class="mx-auto grid max-w-2xl gap-6 px-4 pt-7 pb-32">{{ $slot }}<footer class="text-center text-[10px] leading-6 text-ink-500">Developed by InteXcode<br>{{ config('dcms.business_timezone') }}</footer></main>
+<nav :inert="menuOpen && !desktop" aria-label="Rider navigation" class="fixed inset-x-0 bottom-0 z-20 border-t border-ink-200 bg-white/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm"><div class="mx-auto grid max-w-2xl grid-cols-4 gap-1 py-2 text-center text-[10px]">
+    <a href="{{ route('rider.home') }}" @class(['grid min-h-16 place-content-center justify-items-center gap-1.5 rounded-xl font-semibold', 'bg-brand-soft text-brand-dark'=>request()->routeIs('rider.home'),'text-ink-600'=>!request()->routeIs('rider.home')]) @if(request()->routeIs('rider.home')) aria-current="page" @endif><x-icon name="home" />Home</a>
+    @can('tasks.view')<a href="{{ route('rider.tasks.index') }}" class="grid min-h-16 place-content-center justify-items-center gap-1.5 rounded-xl font-semibold {{ request()->routeIs('rider.tasks.*') ? 'bg-brand-soft text-brand-dark' : 'text-ink-600' }}" @if(request()->routeIs('rider.tasks.*')) aria-current="page" @endif><x-icon name="briefcase" />My Tasks</a>@endcan
+    @can('attendance.view_own')<a href="{{ route('rider.attendance') }}" class="grid min-h-16 place-content-center justify-items-center gap-1.5 rounded-xl font-semibold {{ request()->routeIs('rider.attendance') ? 'bg-brand-soft text-brand-dark' : 'text-ink-600' }}" @if(request()->routeIs('rider.attendance')) aria-current="page" @endif><x-icon name="clock" />Attendance</a>@endcan
+    <a href="{{ route('account.settings') }}" @class(['grid min-h-16 place-content-center justify-items-center gap-1.5 rounded-xl font-semibold', 'bg-brand-soft text-brand-dark'=>request()->routeIs('account.settings'),'text-ink-600'=>!request()->routeIs('account.settings')]) @if(request()->routeIs('account.settings')) aria-current="page" @endif><x-icon name="user" />Account</a>
 </div></nav>
 @livewireScripts
 </body>

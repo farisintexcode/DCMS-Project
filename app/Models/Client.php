@@ -22,4 +22,9 @@ class Client extends Model
     {
         return $this->hasMany(UserClientScope::class);
     }
+
+    public function assignments(): HasMany
+    {
+        return $this->hasMany(AssignmentBatch::class);
+    }
 }

@@ -6,7 +6,7 @@ use App\Actions\Customers\SaveCustomer;
 use App\Models\CustomerCategory;
 use App\Models\Debtor;
 use App\Models\ReferenceValue;
-use App\Services\Customers\CustomerAccess;
+use App\Services\ClientAccess;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
@@ -109,7 +109,7 @@ class Editor extends Component
             abort_unless(Auth::user()->hasClientScope($customer->client), 404);
             Gate::authorize('update', $customer);
         }
-        $access = app(CustomerAccess::class);
+        $access = app(ClientAccess::class);
         $categories = $access->scope(CustomerCategory::query(), Auth::user())->where('client_id', (int) ($this->data['client_id'] ?? 0))->orderBy('name')->get();
 
         return view('livewire.admin.customers.editor', ['clients' => $access->clients(Auth::user())->orderBy('name')->get(), 'categories' => $categories, 'states' => ReferenceValue::query()->where('category', 'state')->where('is_active', true)->orderBy('label')->get()]);

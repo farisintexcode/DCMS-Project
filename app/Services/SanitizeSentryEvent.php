@@ -11,7 +11,7 @@ class SanitizeSentryEvent
     {
         $safe = Event::createEvent($event->getId());
         $safe->setLevel($event->getLevel());
-        $safe->setMessage('DCMS application error. Inspect restricted application logs for details.');
+        $safe->setMessage('DebtOps application error. Inspect restricted application logs for details.');
 
         return $safe;
     }

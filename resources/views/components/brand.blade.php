@@ -1,4 +1,5 @@
-<span {{ $attributes->class(['inline-flex items-center gap-3']) }}>
-    <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-teal-700 text-sm font-bold tracking-tight text-white" aria-hidden="true">IXC</span>
-    <span><span class="block text-lg font-bold tracking-tight">DCMS</span><span class="block text-xs font-normal text-slate-500">by InteXcode</span></span>
+@props(['compact' => false])
+<span {{ $attributes->class(['debtops-brand', 'is-compact' => $compact]) }}>
+    <span class="debtops-logo-full"><img src="{{ asset(config('dcms.branding.logo')) }}" alt="DebtOps" width="906" height="906"></span>
+    <span class="debtops-logo-icon"><img src="{{ asset(config('dcms.branding.icon')) }}" alt="DebtOps" width="1414" height="1112"></span>
 </span>

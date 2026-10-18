@@ -1,0 +1,5 @@
+@props(['label', 'icon' => 'grid', 'active' => false, 'keywords' => ''])
+<div class="sidebar-group" x-data="{ groupOpen: @js($active) }" x-show="matches(@js($label.' '.$keywords))">
+    <button type="button" class="sidebar-link w-full" aria-label="{{ $label }}" :aria-expanded="!rail && (groupOpen || !!query.trim())" aria-controls="nav-group-{{ \Illuminate\Support\Str::slug($label) }}" @if($active) data-active-parent="true" @endif @click="if (rail) { toggleCompact(); groupOpen = true } else { groupOpen = !groupOpen; if (!groupOpen) query = '' }" @mouseenter="hint($event, @js($label))" @mouseleave="tooltip = ''" @focus="hint($event, @js($label))" @blur="tooltip = ''"><x-icon :name="$icon" /><span class="sidebar-label">{{ $label }}</span><x-icon name="chevron" class="sidebar-label ml-auto size-3.5 transition-transform" x-bind:class="groupOpen || query.trim() ? 'rotate-90' : ''" /></button>
+    <x-sidebar-submenu :id="'nav-group-'.\Illuminate\Support\Str::slug($label)">{{ $slot }}</x-sidebar-submenu>
+</div>
