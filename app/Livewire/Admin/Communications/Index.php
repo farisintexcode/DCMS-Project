@@ -17,7 +17,7 @@ class Index extends Component
     {
         Gate::authorize('viewAny', CommunicationTemplate::class);
         $rows = CommunicationTemplate::query()->where('channel', 'email')->whereIn('email_slot', [1, 2, 3])->whereIn('status', ['draft', 'pending_approval', 'approved'])->orderBy('email_slot')->orderByDesc('version')->get();
-        $slots = collect([1, 2, 3])->map(fn ($slot) => ['slot' => $slot, 'draft' => $rows->first(fn ($r) => $r->email_slot === $slot && in_array($r->status, ['draft', 'pending_approval'], true)), 'approved' => $rows->first(fn ($r) => $r->email_slot === $slot && $r->status === 'approved'), 'latest' => CommunicationTemplate::query()->where('channel', 'email')->where('email_slot', $slot)->latest('version')->first()]);
+        $options = collect([1, 2, 3])->map(fn ($slot) => ['slot' => $slot, 'draft' => $rows->first(fn ($r) => $r->email_slot === $slot && in_array($r->status, ['draft', 'pending_approval'], true)), 'approved' => $rows->first(fn ($r) => $r->email_slot === $slot && $r->status === 'approved'), 'latest' => CommunicationTemplate::query()->where('channel', 'email')->where('email_slot', $slot)->latest('version')->first()]);
         $context = [];
         foreach (['customer', 'task'] as $key) {
             $value = request()->query($key);
@@ -26,6 +26,6 @@ class Index extends Component
             }
         }
 
-        return view('livewire.admin.communications.index', ['slots' => $slots, 'approvedCount' => $rows->where('status', 'approved')->count(), 'context' => $context]);
+        return view('livewire.admin.communications.index', ['options' => $options, 'approvedCount' => $rows->where('status', 'approved')->count(), 'context' => $context]);
     }
 }

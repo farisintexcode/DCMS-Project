@@ -70,7 +70,7 @@ test('three approved owner defaults seed idempotently without fabricating approv
 test('template workspace enforces administrative communication grants and current customer scope', function (): void {
     $this->get(route('admin.communications.index'))->assertRedirect(route('login'));
     [$actor] = customerOperator();
-    $this->actingAs($actor)->get(route('admin.communications.index'))->assertOk()->assertSee('Communications');
+    $this->actingAs($actor)->get(route('admin.communications.index'))->assertOk()->assertSee('Communications')->assertSee('View approved option 1')->assertSee('Friendly Payment Reminder');
     $this->get(route('admin.communications.templates.edit', templateDefault()))->assertOk()->assertSee('Saved wording');
     $this->get(route('admin.communications.templates.edit', ['template' => templateDefault()->public_id, 'customer' => Debtor::factory()->create()->public_id]))->assertNotFound();
     $actor->syncRoles([]);
@@ -173,7 +173,7 @@ test('actual customer previews preserve portfolio account and missing financial 
     expect(fn () => app(TemplateRenderer::class)->render(templateDefault(), $data['values']))->toThrow(ValidationException::class);
     $task = Task::factory()->create();
     expect(fn () => $context->values($actor, $customer->public_id, taskId: $task->public_id))->toThrow(ModelNotFoundException::class);
-    UserClientScope::query()->where('user_id', $actor->id)->update(['valid_to' => now()]);
+    UserClientScope::query()->where('user_id', $actor->id)->update(['valid_to' => now()->format('Y-m-d H:i:s.u')]);
     expect(fn () => $context->values($actor, $customer->public_id))->toThrow(ModelNotFoundException::class);
 });
 
@@ -183,7 +183,7 @@ test('Livewire previews escape customer markup and submission refuses unsaved ed
     $customer = Debtor::factory()->create(['client_id' => $client->id, 'display_name_ciphertext' => '<img src=x onerror=alert(1)>']);
     $saved = app(ManageTemplates::class)->save($actor, templateDraft($actor), 0, templateWording());
     $this->actingAs($actor);
-    Livewire::test(Editor::class, ['template' => $saved])->set('customerId',$customer->public_id)->call('preview','customer')->assertHasNoErrors()->assertSee('<img src=x onerror=alert(1)>')->assertDontSeeHtml('<img src=x onerror=alert(1)>')->set('form.body','Unsaved edit')->call('submitForApproval')->assertHasErrors('revision');
+    Livewire::test(Editor::class, ['template' => $saved])->set('customerId', $customer->public_id)->call('preview', 'customer')->assertHasNoErrors()->assertSee('<img src=x onerror=alert(1)>')->assertDontSeeHtml('<img src=x onerror=alert(1)>')->set('form.body', 'Unsaved edit')->call('submitForApproval')->assertHasErrors('revision');
     expect($saved->refresh()->status)->toBe('draft');
     Mail::assertNothingSent();
 });

@@ -14,6 +14,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->preventRequestForgery(except: ['integrations/ses/*/notifications']);
         $middleware->web(append: [EnsureActiveAccount::class]);
         $middleware->redirectGuestsTo(fn (Request $request) => route($request->is('rider', 'rider/*') ? 'rider.login' : 'login'));
         $middleware->redirectUsersTo('/home');

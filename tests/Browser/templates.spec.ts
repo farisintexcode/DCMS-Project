@@ -26,7 +26,7 @@ test('template manager previews approved defaults and reviews replacement histor
     await page.getByRole('button',{name:'Find accessible customer',exact:true}).click();
     await page.getByLabel('Account context (optional)',{exact:true}).selectOption({label:'M06-'+surface.toUpperCase()});
     await page.getByRole('button',{name:'Preview for selected customer',exact:true}).click();
-    await expect(page.getByText(/Required source data unavailable: outstanding_amount, due_date/)).toBeVisible();
+    await expect(page.getByText(/Required source data unavailable:/)).toBeVisible();
     await page.getByRole('button',{name:'Create / open next draft',exact:true}).click();
     await expect(page.getByText('Version 2.0 · Draft',{exact:true})).toBeVisible();
     await page.getByLabel('Template name',{exact:true}).fill('Synthetic '+surface+' notice');

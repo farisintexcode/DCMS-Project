@@ -3,12 +3,18 @@
 use App\Http\Controllers\AttendanceExportController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\SessionController;
+use App\Http\Controllers\LetterDownloadController;
+use App\Http\Controllers\SesNotificationController;
 use App\Http\Controllers\TaskProofController;
 use App\Livewire\Account\Settings;
 use App\Livewire\Admin\Assignments\Editor as AssignmentEditor;
 use App\Livewire\Admin\Assignments\Index as AssignmentIndex;
 use App\Livewire\Admin\Attendance\Configuration;
 use App\Livewire\Admin\Calls\FollowUps;
+use App\Livewire\Admin\Communications\Letters;
+use App\Livewire\Admin\Communications\Preferences;
+use App\Livewire\Admin\Communications\Receipts;
+use App\Livewire\Admin\Communications\Recipients;
 use App\Livewire\Admin\Customers\Categories;
 use App\Livewire\Admin\Customers\Editor;
 use App\Livewire\Admin\Customers\Index;
@@ -27,6 +33,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login');
+Route::post('/integrations/ses/{account}/notifications', SesNotificationController::class)->whereUuid('account')->middleware('throttle:ses-receipts')->name('integrations.ses.notifications');
 Route::middleware('guest')->group(function (): void {
     Route::get('/login', [SessionController::class, 'create'])->name('login');
     Route::post('/login', [SessionController::class, 'store'])->middleware('throttle:login')->name('login.store');
@@ -51,7 +58,13 @@ Route::middleware(['auth', 'auth.session'])->group(function (): void {
     })->name('home');
     Route::livewire('/admin', AdminHome::class)->middleware('can:admin.access')->name('admin.home');
     Route::middleware(['can:admin.access', 'can:communications.view'])->prefix('admin/communications')->name('admin.communications.')->group(function (): void {
+        Route::livewire('/letters', Letters::class)->name('letters');
+        Route::get('/letters/{letter}/download', LetterDownloadController::class)->whereUuid('letter')->middleware(['signed', 'throttle:10,1'])->name('letters.download');
+        Route::get('/receipts', Receipts::class)->name('receipts');
         Route::livewire('/', App\Livewire\Admin\Communications\Index::class)->name('index');
+        Route::livewire('/recipients', Recipients::class)->name('recipients');
+        Route::livewire('/preferences/{customer}', Preferences::class)->whereUuid('customer')->name('preferences');
+        Route::livewire('/batches/{batch}', App\Livewire\Admin\Communications\Batches\Show::class)->whereUuid('batch')->name('batches.show');
         Route::livewire('/templates/{template}', App\Livewire\Admin\Communications\Templates\Editor::class)->whereUuid('template')->name('templates.edit');
     });
     Route::middleware(['can:admin.access', 'can:calls.record', 'can:customers.view'])->prefix('admin/calls')->name('admin.calls.')->group(function (): void {

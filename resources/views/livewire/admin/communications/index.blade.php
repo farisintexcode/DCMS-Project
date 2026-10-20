@@ -1,13 +1,18 @@
 <section class="grid min-w-0 gap-6">
-<x-feedback /><x-page-header title="Communications" eyebrow="Customer correspondence" description="Prepare consistent wording, review personalized content and retain every approved version." />
+<x-feedback />
+@can('customers.view')<a class="btn btn-secondary justify-self-start" href="{{ route('admin.communications.letters', $context) }}">Private letters</a>@endcan
+@can('integrations.manage')<a class="btn btn-secondary justify-self-start" href="{{ route('admin.communications.receipts') }}">SES receipt inbox</a>@endcan
+@can('communications.compose')<a class="btn btn-primary justify-self-start" href="{{ route('admin.communications.recipients') }}">Prepare email recipients</a>
+@endcan
+<x-page-header title="Communications" eyebrow="Customer correspondence" description="Prepare consistent wording, review personalized content and retain every approved version." />
 <div class="surface grid gap-4 p-6 sm:grid-cols-2"><div><p class="eyebrow">Template readiness</p><p class="mt-3 text-3xl font-semibold">{{ $approvedCount }} <span class="text-base font-normal text-ink-500">of 3 options approved</span></p></div><p class="text-sm leading-7 text-ink-600">Each option needs approved wording. Sending also requires reviewed recipients and verified provider settings. Preparing a template or preview sends no message.</p></div>
 <div class="grid gap-5 lg:grid-cols-3">
-@foreach($slots as $option)
+@foreach($options as $option)
 <article class="surface grid content-start gap-5 p-6"><div class="flex items-center justify-between gap-3"><span class="grid size-11 place-items-center rounded-xl bg-brand-soft font-bold">{{ $option['slot'] }}</span><x-badge :tone="$option['approved']?'success':'neutral'">{{ $option['approved']?'Approved option':'Wording needed' }}</x-badge></div><h2 class="text-lg font-semibold">{{ $option['approved']?->name ?? $option['latest']?->name ?? 'Email / letter option '.$option['slot'] }}</h2>
 @if($option['approved'])<p class="break-words text-sm">{{ $option['approved']->subject_template }}</p><p class="text-xs text-ink-500">Approved version {{ $option['approved']->version }}.0</p><a class="btn btn-secondary" href="{{ route('admin.communications.templates.edit',['template'=>$option['approved']->public_id,...$context]) }}">View approved option {{ $option['slot'] }}</a>@else<p class="text-sm leading-6 text-ink-500">Save and approve your organization’s wording before this option can be selected for delivery.</p>@endif
 @if($option['draft'])<a class="btn btn-primary" href="{{ route('admin.communications.templates.edit',['template'=>$option['draft']->public_id,...$context]) }}">{{ $option['draft']->status==='pending_approval'?'Review pending option ':'Open draft option ' }}{{ $option['slot'] }}</a>@elseif(!$option['approved'] && $option['latest'])<a class="btn btn-secondary" href="{{ route('admin.communications.templates.edit',['template'=>$option['latest']->public_id,...$context]) }}">View option history {{ $option['slot'] }}</a>@endif
 </article>
 @endforeach
 </div>
-<section class="surface grid gap-3 p-6"><h2 class="text-lg font-semibold">Delivery services</h2><p class="text-sm leading-7 text-ink-600">Single and bulk email, private letter files, WhatsApp conversations and calling will connect through their verified service workflows. They are currently unavailable. Template approval does not activate a channel.</p></section>
+<section class="surface grid gap-3 p-6"><h2 class="text-lg font-semibold">Communication services</h2><p class="text-sm leading-7 text-ink-600">Prepare email recipients or generate private letters using approved wording and verified source data. External email delivery requires approved provider settings. WhatsApp messaging and calling await their provider workflows.</p></section>
 </section>

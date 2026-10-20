@@ -33,12 +33,13 @@ test('staff creation preserves staff number encrypts private contacts and never 
 });
 
 test('staff validation rejects invalid fields without partial persistence', function (array $invalid, string $field): void {
+    $audits = AuditLog::query()->count();
     $actor = staffManager();
 
     Livewire::actingAs($actor)->test(Editor::class)->set('data', staffInput($invalid))->call('save')->assertHasErrors('data.'.$field);
 
     $this->assertDatabaseCount('staff', 0);
-    $this->assertDatabaseCount('audit_logs', 0);
+    $this->assertDatabaseCount('audit_logs', $audits);
 })->with([
     [['staff_no' => ''], 'staff_no'], [['first_name' => []], 'first_name'], [['email' => 'invalid'], 'email'],
     [['position_code' => 'male'], 'position_code'], [['gender_code' => '99'], 'gender_code'],

@@ -46,10 +46,11 @@ test('assignment creation preserves identifiers trims metadata and audits withou
 });
 
 test('batch validation refuses invalid metadata atomically', function (array $changes, string $field): void {
+    $audits = AuditLog::query()->count();
     [$user, $client] = customerOperator();
     Livewire::actingAs($user)->test(Editor::class)->set('data', batchInput($client, $changes))->call('save')->assertHasErrors('data.'.$field);
     $this->assertDatabaseCount('assignment_batches', 0);
-    $this->assertDatabaseCount('audit_logs', 0);
+    $this->assertDatabaseCount('audit_logs', $audits);
 })->with([
     [['name' => ' '], 'name'], [['due_date' => '2026-09-30'], 'due_date'], [['start_date' => '2026-02-30'], 'start_date'],
     [['type_code' => '99'], 'type_code'], [['state_code' => 'unknown'], 'state_code'], [['external_reference' => str_repeat('x', 101)], 'external_reference'],

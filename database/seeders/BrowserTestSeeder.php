@@ -18,6 +18,9 @@ use App\Models\ImportBatch;
 use App\Models\ImportColumnMapping;
 use App\Models\ImportField;
 use App\Models\ImportRow;
+use App\Models\IntegrationAccount;
+use App\Models\IntegrationEvent;
+use App\Models\OutboxEvent;
 use App\Models\Staff;
 use App\Models\Task;
 use App\Models\TaskAllocation;
@@ -41,6 +44,9 @@ class BrowserTestSeeder extends Seeder
         $admin->assignRole('Admin');
         $admin->givePermissionTo('users.invite');
         $admin->givePermissionTo('templates.approve');
+        $admin->givePermissionTo('communications.generate_letter');
+        $admin->givePermissionTo('integrations.manage');
+        $admin->givePermissionTo(['communication-permission.create', 'communication-permission.update', 'communication-permission.block', 'communication-permission.approve', 'communication-permission.override']);
         $client = Client::factory()->create(['code' => 'SYNTHETIC', 'name' => 'Synthetic Client']);
         $scope = new UserClientScope;
         $scope->user_id = $admin->id;
@@ -109,6 +115,18 @@ class BrowserTestSeeder extends Seeder
                 $check = app(CompletionChecklist::class)->review($reviewTask->refresh(), $rider);
                 app(RiderWork::class)->submit($rider, $reviewTask, $reviewTask->lock_version, (string) Str::uuid7(), $check['digest']);
             }
+        }
+        foreach (['desktop', 'rider-mobile'] as $surface) {
+            $recipient = Debtor::query()->where('customer_reference', 'RIDER-'.strtoupper($surface))->firstOrFail();
+            $email = 'service-'.$surface.'@example.test';
+            Contact::factory()->create(['debtor_id' => $recipient->id, 'kind_code' => 'email', 'value_ciphertext' => $email, 'value_fingerprint' => app(CustomerSearch::class)->token('contact:email', $email)]);
+        }
+        // Guarded historical inbox fixture only: never provisions an account, topic or live listener.
+        foreach (['desktop', 'rider-mobile'] as $surface) {
+            $receiptAccount = IntegrationAccount::factory()->create(['name' => 'Synthetic SES receipts '.$surface, 'provider_code' => 'amazon_ses']);
+            $receipt = IntegrationEvent::factory()->create(['integration_account_id' => $receiptAccount->id, 'state' => 'needs_resolution', 'resolution_code' => 'unmatched_provider_resource']);
+            $outbox = new OutboxEvent;
+            $outbox->forceFill(['event_key' => (string) Str::uuid7(), 'event_type' => 'ses.receipt', 'aggregate_type' => 'integration_event', 'aggregate_id' => $receipt->id, 'payload' => [], 'available_at' => now()->addDay()])->save();
         }
     }
 }

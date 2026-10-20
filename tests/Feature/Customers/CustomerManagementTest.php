@@ -98,13 +98,14 @@ test('duplicate identity requires review and never merges customers', function (
 });
 
 test('invalid customer data is reported without partial writes', function (array $changes, string $field): void {
+    $audits = AuditLog::query()->count();
     [$user, $client] = customerOperator();
 
     Livewire::actingAs($user)->test(Editor::class)->set('data', customerInput($client, $changes))->call('save')->assertHasErrors('data.'.$field);
 
     $this->assertDatabaseCount('debtors', 0);
     $this->assertDatabaseCount('contacts', 0);
-    $this->assertDatabaseCount('audit_logs', 0);
+    $this->assertDatabaseCount('audit_logs', $audits);
 })->with([
     [['name' => ' '], 'name'], [['party_type' => 'unknown'], 'party_type'], [['status' => 'deleted'], 'status'],
     [['customer_reference' => ''], 'customer_reference'], [['identity' => '<script>'], 'identity'],
@@ -182,13 +183,14 @@ test('revoked scope blocks a previously opened customer form', function (): void
 });
 
 test('cross-client category rolls back the entire customer creation', function (): void {
+    $audits = AuditLog::query()->count();
     [$user, $client] = customerOperator();
     $foreignCategory = CustomerCategory::factory()->create();
 
     expect(fn () => app(SaveCustomer::class)->handle($user, customerInput($client, ['category_ids' => [$foreignCategory->id]])))->toThrow(ValidationException::class);
 
     $this->assertDatabaseCount('debtors', 0);
-    $this->assertDatabaseCount('audit_logs', 0);
+    $this->assertDatabaseCount('audit_logs', $audits);
 });
 
 test('customer update without contact grant preserves contacts and hides editor values', function (): void {

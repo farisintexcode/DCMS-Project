@@ -2,6 +2,22 @@
 
 /** Plan.md/M14 owner-approved placeholder registry and initial wording, 18 October 2026. */
 return [
+    'ses_receipts_enabled' => (bool) env('MAIL_SES_RECEIPTS_ENABLED', false),
+    'ses_configuration_set' => env('MAIL_SES_CONFIGURATION_SET'),
+    'ses_topics' => array_values(array_filter(array_map('trim', explode(',', (string) env('MAIL_SES_SNS_TOPICS', ''))))),
+    'delivery_enabled' => (bool) env('MAIL_LIVE_SENDING_ENABLED', false),
+    'email_account' => env('MAIL_SES_ACCOUNT'),
+    'daily_limit' => (int) env('MAIL_DAILY_LIMIT', 1000),
+    'sandbox_recipients' => array_values(array_filter(array_map('trim', explode(',', (string) env('MAIL_SANDBOX_RECIPIENTS', ''))))),
+    'rate_limit' => (int) env('MAIL_RATE_LIMIT_PER_SECOND', 2),
+    'sandbox_enabled' => (bool) env('MAIL_SANDBOX_ENABLED', true),
+    'ses_region' => env('AWS_DEFAULT_REGION', 'ap-southeast-1'),
+    'retry_delays' => [30, 120, 300],
+    'max_attempts' => 3,
+    'attempt_timeout' => 120,
+    'preview_max_recipients' => 250,
+    'basis_codes' => ['EXISTING_ACCOUNT_RELATIONSHIP', 'CLIENT_AUTHORIZED_COLLECTION', 'CUSTOMER_PROVIDED_CONTACT', 'EXPLICIT_SERVICE_CONSENT', 'LEGAL_OR_REGULATORY_BASIS'],
+    'preference_states' => ['allowed', 'blocked', 'unknown', 'withdrawn', 'invalid_address', 'hard_bounced', 'under_review'],
     'placeholders' => [
         'customer_name' => 'Customer name', 'account_number' => 'Selected account number',
         'outstanding_amount' => 'Outstanding amount from approved financial source',

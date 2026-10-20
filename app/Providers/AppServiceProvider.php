@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Http\Middleware\EnsureActiveAccount;
 use App\Models\CollectionActivity;
+use App\Models\Communication;
 use App\Models\ImportBatch;
 use App\Models\Task;
 use App\Models\User;
@@ -22,7 +23,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Model::preventLazyLoading(! app()->isProduction());
-        Relation::enforceMorphMap(['user' => User::class, 'import' => ImportBatch::class, 'task' => Task::class, 'activity' => CollectionActivity::class]);
+        Relation::enforceMorphMap(['user' => User::class, 'import' => ImportBatch::class, 'task' => Task::class, 'activity' => CollectionActivity::class, 'communication' => Communication::class]);
         Gate::define('use-rider-interface', fn (User $user): bool => $user->canUseRiderInterface());
         Gate::define('viewPulse', fn (User $user): bool => $user->isActive() && $user->can('monitoring.view'));
         Livewire::addPersistentMiddleware([EnsureActiveAccount::class, AuthenticateSession::class]);
@@ -31,5 +32,7 @@ class AppServiceProvider extends ServiceProvider
             Limit::perMinute(30)->by($request->ip()),
         ]);
         RateLimiter::for('recovery', fn (Request $request) => Limit::perMinute(5)->by($request->ip()));
+        RateLimiter::for('service-email', fn () => Limit::perSecond(max(1, config('communications.rate_limit')))->by('debtops-email-global'));
+        RateLimiter::for('ses-receipts', fn (Request $request) => Limit::perMinute(300)->by($request->ip()));
     }
 }

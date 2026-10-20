@@ -32,7 +32,7 @@ Derived tracking index only; Database.md remains authoritative for every field, 
 | [task_reviews](../Database.md#table-task_reviews) | TaskReview | M07 | Implemented M07: immutable independent decisions |
 | [financial_updates](../Database.md#table-financial_updates) | FinancialUpdate | M08 | Planned |
 | [financial_snapshots](../Database.md#table-financial_snapshots) | FinancialSnapshot | M08 | Planned |
-| [documents](../Database.md#table-documents) | Document | M04/M06/M09/M01 | M04 implemented; dependent target kinds remain gated |
+| [documents](../Database.md#table-documents) | Document | M04/M06/M09/M01/M14 | Private source/proof/letter artifacts implemented; reporting targets remain gated |
 | [export_jobs](../Database.md#table-export_jobs) | ExportJob | M09 | Planned |
 | [bulk_operations](../Database.md#table-bulk_operations) | BulkOperation | M05 | M05 implemented; execution/review extensions follow in M06/M07 |
 | [bulk_operation_items](../Database.md#table-bulk_operation_items) | BulkOperationItem | M05 | M05 implemented; execution/review extensions follow in M06/M07 |
@@ -58,15 +58,15 @@ Derived tracking index only; Database.md remains authoritative for every field, 
 | [attendance_schedules](../Database.md#table-attendance_schedules) | AttendanceSchedule | M10 | Implemented explicit assignments/calendar; versioned corrections |
 | [attendances](../Database.md#table-attendances) | Attendance | M10 | Implemented immutable raw punches and approved effective projection |
 | [attendance_adjustments](../Database.md#table-attendance_adjustments) | AttendanceAdjustment | M10 | Implemented independent decisions, immutable payload/history |
-| [integration_accounts](../Database.md#table-integration_accounts) | IntegrationAccount | M14/M12 | Planned |
-| [communication_templates](../Database.md#table-communication_templates) | CommunicationTemplate | M14 | Planned |
-| [communication_batches](../Database.md#table-communication_batches) | CommunicationBatch | M14 | Planned |
-| [conversations](../Database.md#table-conversations) | Conversation | M14 | Planned |
-| [communications](../Database.md#table-communications) | Communication | M14/M11/M13 | Planned |
-| [communication_attempts](../Database.md#table-communication_attempts) | CommunicationAttempt | M14 | Planned |
-| [integration_events](../Database.md#table-integration_events) | IntegrationEvent | M14 | Planned |
-| [communication_events](../Database.md#table-communication_events) | CommunicationEvent | M14 | Planned |
-| [communication_preferences](../Database.md#table-communication_preferences) | CommunicationPreference | M14/M13 | Planned |
-| [communication_quota_reservations](../Database.md#table-communication_quota_reservations) | CommunicationQuotaReservation | M14 | Planned |
+| [integration_accounts](../Database.md#table-integration_accounts) | IntegrationAccount | M14/M12 | Provider parent implemented; no account activated |
+| [communication_templates](../Database.md#table-communication_templates) | CommunicationTemplate | M14 | Implemented UI65: owner-approved defaults, versioned review and scoped previews |
+| [communication_batches](../Database.md#table-communication_batches) | CommunicationBatch | M14 | Frozen previews, exact confirmation and queued processing controls; live activation gated |
+| [conversations](../Database.md#table-conversations) | Conversation | M14 | Canonical parent schema only; channel workflows pending |
+| [communications](../Database.md#table-communications) | Communication | M14/M11/M13 | Frozen email/letter envelopes, private PDF workflow and authenticated email receipts; external activation gated |
+| [communication_attempts](../Database.md#table-communication_attempts) | CommunicationAttempt | M14 | Retained provider attempts, capped definitive retries and ambiguity |
+| [integration_events](../Database.md#table-integration_events) | IntegrationEvent | M14 | Verified encrypted SES/SNS inbox, deduplication and safe unresolved-event review |
+| [communication_events](../Database.md#table-communication_events) | CommunicationEvent | M14 | Append-only local/verified provider events and semantic receipt deduplication |
+| [communication_preferences](../Database.md#table-communication_preferences) | CommunicationPreference | M14/M13 | Versioned service-email evidence, restrictions and reserved-permission review |
+| [communication_quota_reservations](../Database.md#table-communication_quota_reservations) | CommunicationQuotaReservation | M14 | Atomic rolling quotas; unknowns reconcile to consumed only through verified receipt provenance |
 | [call_permissions](../Database.md#table-call_permissions) | CallPermission | M14 | Planned |
 | [voice_sessions](../Database.md#table-voice_sessions) | VoiceSession | M14 | Planned |

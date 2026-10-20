@@ -60,7 +60,7 @@ test('login errors are neutral and do not log attempted email', function (): voi
     $this->post(route('login.store'), ['email' => 'unknown@example.test', 'password' => 'wrong'])->assertSessionHasErrors(['email' => __('auth.failed')]);
 
     $this->assertGuest();
-    expect(AuditLog::query()->first()->toJson())->not->toContain('unknown@example.test', 'wrong');
+    expect(AuditLog::query()->where('action', 'login_failed')->firstOrFail()->toJson())->not->toContain('unknown@example.test', 'wrong');
 });
 
 test('login attempts are throttled', function (): void {
