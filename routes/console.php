@@ -14,3 +14,5 @@ Schedule::command('communications:dispatch-letters')->everyMinute()->withoutOver
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+Schedule::command('reports:dispatch')->everyMinute()->withoutOverlapping();

@@ -42,8 +42,8 @@ test('authorized Rider invitation creates only the selected role no scope and a 
         ->and($account->clientScopes()->count())->toBe(0)->and($account->isActive())->toBeFalse();
     Notification::assertSentTo($account, StaffInvitation::class);
     $invitationMail = Notification::sent($account, StaffInvitation::class)->last()->toMail($account);
-    expect($invitationMail->subject)->toBe('Activate your DebtOps staff account');
-    expect((string) $invitationMail->render())->toContain('Welcome to DebtOps', 'Debt Collection Management System by InteXcode');
+    expect($invitationMail->subject)->toBe('Activate your Nexora staff account');
+    expect((string) $invitationMail->render())->toContain('Welcome to Nexora', 'Debt Collection Management System');
     $token = invitationToken($account);
     expect(Password::tokenExists($account, $token))->toBeTrue();
     expect(DB::table('password_reset_tokens')->where('email', $account->email)->value('token') === $token)->toBeFalse();

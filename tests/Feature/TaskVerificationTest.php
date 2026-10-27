@@ -13,6 +13,7 @@ use App\Models\TaskReview;
 use App\Models\TaskSubmission;
 use App\Models\User;
 use App\Models\UserClientScope;
+use App\Services\Reports\TaskReports;
 use App\Services\Tasks\CompletionChecklist;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -212,4 +213,18 @@ test('return cannot strand a correction with a Rider whose submission permission
     expect($preview['rows'][0]['issues'])->toHaveKey('rider');
     expect(fn () => app(ReviewSubmission::class)->confirm($reviewer, $preview))->toThrow(ValidationException::class);
     expect($task->refresh()->work_status)->toBe('submitted')->and($rider->notifications()->count())->toBe(0);
+});
+
+test('reports count submitted work separately from independently verified completion', function (): void {
+    [$reviewer,$rider,$task,$submission] = reviewFixture();
+    $reports = app(TaskReports::class);
+    $criteria = ['family' => 'task', 'columns' => TaskReports::DEFAULT_COLUMNS];
+    $before = $reports->snapshot($reviewer, $criteria);
+    expect($before['totals']['pending_verification'])->toBe(1)->and($before['totals']['completed'])->toBe(0);
+    expect($reports->snapshot($reviewer, array_replace($criteria, ['family' => 'completed_task']))['rows'])->toBe([]);
+    app(ReviewSubmission::class)->confirm($reviewer, verificationPreview($reviewer, $submission));
+    $after = $reports->snapshot($reviewer, array_replace($criteria, ['family' => 'completed_task']));
+    expect($after['totals']['completed'])->toBe(1)->and($after['rows'][0]['review_status'])->toBe('approved');
+    $performance = $reports->snapshot($reviewer, array_replace($criteria, ['family' => 'rider_performance']));
+    expect($performance['rows'][0]['allocated'])->toBe(1)->and($performance['rows'][0]['completed'])->toBe(1);
 });

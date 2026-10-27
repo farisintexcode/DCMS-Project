@@ -20,7 +20,7 @@ class LetterPdf
         $options->setChroot(public_path('images/brand'));
         $options->setDefaultFont('DejaVu Sans');
         $pdf = new Dompdf($options);
-        $logo = 'data:image/png;base64,'.base64_encode(file_get_contents(public_path(config('dcms.branding.icon'))));
+        $logo = 'data:image/png;base64,'.base64_encode(file_get_contents(public_path(config('dcms.branding.icon_png'))));
         $pdf->loadHtml(view('livewire.admin.communications.letter-pdf', ['letter' => $letter, 'logo' => $logo])->render(), 'UTF-8');
         $pdf->setPaper('A4');
         $pdf->render();

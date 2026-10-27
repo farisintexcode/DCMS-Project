@@ -4,6 +4,7 @@ use App\Http\Controllers\AttendanceExportController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\SessionController;
 use App\Http\Controllers\LetterDownloadController;
+use App\Http\Controllers\ReportDownloadController;
 use App\Http\Controllers\SesNotificationController;
 use App\Http\Controllers\TaskProofController;
 use App\Livewire\Account\Settings;
@@ -28,6 +29,7 @@ use App\Livewire\Admin\Staff\Show as StaffShow;
 use App\Livewire\Admin\Tasks\Allocation;
 use App\Livewire\Rider\Attendance;
 use App\Livewire\Rider\Home as RiderHome;
+use App\Livewire\Rider\Notifications;
 use App\Livewire\Rider\Tasks\SubmissionHistory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -78,6 +80,10 @@ Route::middleware(['auth', 'auth.session'])->group(function (): void {
         Route::get('/export', AttendanceExportController::class)->middleware('throttle:10,1')->name('export');
         Route::livewire('/{schedule}', App\Livewire\Admin\Attendance\Show::class)->whereUuid('schedule')->name('show');
     });
+    Route::middleware(['can:admin.access', 'can:reports.view', 'can:tasks.view', 'can:tasks.monitor'])->group(function (): void {
+        Route::livewire('/admin/reports', App\Livewire\Admin\Reports\Index::class)->name('admin.reports.index');
+        Route::get('/admin/reports/{exportJob}/download', ReportDownloadController::class)->whereUuid('exportJob')->middleware(['can:reports.export', 'signed', 'throttle:10,1'])->name('admin.reports.download');
+    });
     Route::middleware(['can:admin.access', 'can:tasks.verify'])->prefix('admin/verification')->name('admin.verification.')->group(function (): void {
         Route::livewire('/', App\Livewire\Admin\Verification\Index::class)->name('index');
         Route::livewire('/{submission}', App\Livewire\Admin\Verification\Show::class)->whereUuid('submission')->name('show');
@@ -119,6 +125,11 @@ Route::middleware(['auth', 'auth.session'])->group(function (): void {
         Route::livewire('/{customer}', Show::class)->name('show');
     });
     Route::livewire('/rider', RiderHome::class)->middleware('can:use-rider-interface')->name('rider.home');
+    Route::middleware(['can:use-rider-interface', 'can:tasks.view'])->prefix('rider/assignments')->name('rider.assignments.')->group(function (): void {
+        Route::livewire('/', App\Livewire\Rider\Assignments\Index::class)->name('index');
+        Route::livewire('/{batch}', App\Livewire\Rider\Assignments\Show::class)->whereUuid('batch')->name('show');
+    });
+    Route::livewire('/rider/notifications', Notifications::class)->middleware('can:use-rider-interface')->name('rider.notifications');
     Route::livewire('/rider/attendance', Attendance::class)->middleware(['can:use-rider-interface', 'can:attendance.view_own'])->name('rider.attendance');
     Route::livewire('/attendance', Attendance::class)->middleware('can:attendance.view_own')->name('attendance.own');
     Route::middleware(['can:use-rider-interface', 'can:tasks.view'])->prefix('rider/tasks')->name('rider.tasks.')->group(function (): void {

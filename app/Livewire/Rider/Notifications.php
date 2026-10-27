@@ -1,0 +1,38 @@
+<?php
+
+namespace App\Livewire\Rider;
+
+use App\Models\Task;
+use App\Notifications\AttendanceCorrected;
+use App\Notifications\TaskReviewed;
+use App\Services\Tasks\RiderAccess;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
+use Illuminate\View\View;
+use Livewire\Attributes\Layout;
+use Livewire\Component;
+use Livewire\WithPagination;
+
+/** Own existing operational notifications only; opening the page does not mutate read state. */
+#[Layout('layouts.rider')]
+class Notifications extends Component
+{
+    use WithPagination;
+
+    public function render(RiderAccess $access): View
+    {
+        Gate::authorize('use-rider-interface');
+        $types = [];
+        if (auth()->user()->can('tasks.view')) {
+            $types[] = TaskReviewed::class;
+        }
+        if (auth()->user()->can('attendance.view_own')) {
+            $types[] = AttendanceCorrected::class;
+        }
+        $notifications = auth()->user()->notifications()->whereIn('type', $types)->orderByDesc('created_at')->orderByDesc('id')->paginate(15);
+        $taskIds = $notifications->getCollection()->where('type', TaskReviewed::class)->pluck('data.task')->filter(fn ($id) => is_string($id) && Str::isUuid($id))->all();
+        $accessibleTasks = $access->scope(Task::query(), auth()->user())->whereIn('public_id', $taskIds)->pluck('public_id')->all();
+
+        return view('livewire.rider.notifications', compact('notifications', 'accessibleTasks'));
+    }
+}

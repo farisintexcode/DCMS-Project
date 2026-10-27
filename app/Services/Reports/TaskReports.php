@@ -1,0 +1,142 @@
+<?php
+
+namespace App\Services\Reports;
+
+use App\Models\Task;
+use App\Models\User;
+use App\Services\Tasks\TaskAccess;
+use Carbon\CarbonImmutable;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
+
+/** M09/UI27: explicit operational projections; no financial or contact-data inference. */
+class TaskReports
+{
+    public const FAMILIES = ['task' => 'Task', 'rider_assignment' => 'Rider Assignment', 'rider_performance' => 'Rider Performance', 'completed_task' => 'Completed Task', 'verification' => 'Verification'];
+
+    public const COLUMNS = ['task_reference' => 'Task reference', 'iwk_id' => 'IWK ID', 'client' => 'Client', 'batch' => 'Assignment', 'customer_reference' => 'Customer reference', 'account_reference' => 'Masked account', 'rider_staff_no' => 'Current Rider staff no.', 'work_status' => 'Work status', 'review_status' => 'Review status', 'created_at' => 'Created (MYT)', 'due_at' => 'Due (MYT)', 'submitted_at' => 'Submitted (MYT)', 'completed_at' => 'Completed (MYT)', 'excluded' => 'Excluded', 'payment_update' => 'Payment update marker'];
+
+    public const PERFORMANCE = ['rider_staff_no' => 'Current Rider staff no.', 'allocated' => 'Current allocated tasks', 'completed' => 'Verified/completed tasks', 'pending_verification' => 'Pending verification', 'returned' => 'Returned tasks'];
+
+    public const DEFAULT_COLUMNS = ['task_reference', 'iwk_id', 'batch', 'rider_staff_no', 'work_status', 'review_status', 'due_at'];
+
+    public function authorize(User $actor, bool $export = false): void
+    {
+        abort_unless($actor->isActive(), 403);
+        foreach (['admin.access', 'tasks.view', 'tasks.monitor', 'reports.view'] as $permission) {
+            Gate::forUser($actor)->authorize($permission);
+        }
+        if ($export) {
+            Gate::forUser($actor)->authorize('reports.export');
+        }
+    }
+
+    public function criteria(array $input): array
+    {
+        return Validator::make($input, [
+            'family' => ['required', Rule::in(array_keys(self::FAMILIES))],
+            'from' => ['nullable', 'date_format:Y-m-d'], 'until' => ['nullable', 'date_format:Y-m-d', Rule::when(! empty($input['from']), 'after_or_equal:from')],
+            'client' => ['nullable', 'uuid'], 'batch' => ['nullable', 'uuid'], 'rider' => ['nullable', 'string', 'max:100'],
+            'status' => ['nullable', Rule::in(['unstarted', 'in_progress', 'submitted', 'completed', 'cancelled'])],
+            'iwk' => ['nullable', 'string', 'max:100'], 'columns' => ['required', 'array', 'min:1', 'max:15'],
+            'columns.*' => ['required', 'distinct', Rule::in(array_keys(self::COLUMNS))],
+        ])->validate();
+    }
+
+    public function query(User $actor, array $criteria): Builder
+    {
+        $this->authorize($actor);
+        if ($criteria['family'] === 'verification') {
+            Gate::forUser($actor)->authorize('tasks.verify');
+        }
+        $q = app(TaskAccess::class)->scope(Task::query(), $actor);
+        foreach (['from', 'until'] as $key) {
+            if (! empty($criteria[$key])) {
+                $date = CarbonImmutable::createFromFormat('!Y-m-d', $criteria[$key], config('dcms.business_timezone'));
+                $q->where('created_at', $key === 'from' ? '>=' : '<=', ($key === 'from' ? $date->startOfDay() : $date->endOfDay())->utc());
+            }
+        }
+        if (! empty($criteria['client'])) {
+            $q->whereHas('batch.client', fn ($b) => $b->where('public_id', $criteria['client']));
+        }
+        if (! empty($criteria['batch'])) {
+            $q->whereHas('batch', fn ($b) => $b->where('public_id', $criteria['batch']));
+        }
+        if (! empty($criteria['rider'])) {
+            $q->whereHas('currentAllocation.collector', fn ($s) => $s->where('staff_no', $criteria['rider']));
+        }
+        if (! empty($criteria['status'])) {
+            $q->where('work_status', $criteria['status']);
+        }
+        if (! empty($criteria['iwk'])) {
+            $q->where('source_iwk_id', $criteria['iwk']);
+        }
+        if ($criteria['family'] === 'completed_task') {
+            $q->where('work_status', 'completed');
+        }
+        if ($criteria['family'] === 'verification') {
+            $q->where(fn ($s) => $s->where('work_status', 'submitted')->orWhereIn('review_status', ['returned', 'approved']));
+        }
+        if (in_array($criteria['family'], ['rider_assignment', 'rider_performance'])) {
+            $q->whereHas('currentAllocation');
+        }
+
+        return $q;
+    }
+
+    public function snapshot(User $actor, array $input): array
+    {
+        $criteria = $this->criteria($input);
+
+        return DB::transaction(function () use ($actor, $criteria): array {
+            if (DB::transactionLevel() === 1) {
+                DB::statement('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+            }
+            $tasks = $this->query($actor, $criteria)->with(['batch.client', 'customer', 'account', 'currentAllocation.collector'])->orderBy('id')->limit(config('reports.max_tasks') + 1)->get();
+            if ($tasks->count() > config('reports.max_tasks')) {
+                throw ValidationException::withMessages(['report' => 'Narrow the filters to at most '.config('reports.max_tasks').' tasks.']);
+            }
+            $rows = $tasks->map(fn (Task $t) => $this->row($t))->all();
+            $totals = ['tasks' => $tasks->count(), 'completed' => $tasks->where('work_status', 'completed')->count(), 'pending_verification' => $tasks->where('work_status', 'submitted')->count(), 'returned' => $tasks->where('review_status', 'returned')->count()];
+            if ($criteria['family'] === 'rider_performance') {
+                $rows = $tasks->groupBy(fn ($t) => $t->currentAllocation->collector->staff_no)->map(fn ($group, $staff) => ['rider_staff_no' => (string) $staff, 'allocated' => $group->count(), 'completed' => $group->where('work_status', 'completed')->count(), 'pending_verification' => $group->where('work_status', 'submitted')->count(), 'returned' => $group->where('review_status', 'returned')->count()])->values()->all();
+            }
+            $columns = $criteria['family'] === 'rider_performance' ? self::PERFORMANCE : array_intersect_key(self::COLUMNS, array_flip($criteria['columns']));
+            $rows = array_map(fn ($row) => array_intersect_key($row, $columns), $rows);
+
+            return ['criteria' => $criteria, 'as_of' => now()->toIso8601String(), 'task_ids' => $tasks->pluck('public_id')->all(), 'columns' => $columns, 'rows' => $rows, 'totals' => $totals];
+        });
+    }
+
+    private function row(Task $task): array
+    {
+        $time = fn ($v) => $v?->timezone(config('dcms.business_timezone'))->format('Y-m-d H:i:s') ?? '';
+
+        return ['task_reference' => $task->public_id, 'iwk_id' => $task->source_iwk_id ?? '', 'client' => $task->batch->client->name, 'batch' => $task->batch->name, 'customer_reference' => $task->customer->customer_reference, 'account_reference' => Str::mask((string) $task->account->account_number, '*', 0, max(0, mb_strlen((string) $task->account->account_number) - 4)), 'rider_staff_no' => $task->currentAllocation?->collector?->staff_no ?? '', 'work_status' => $task->work_status, 'review_status' => $task->review_status, 'created_at' => $time($task->created_at), 'due_at' => $time($task->effectiveDue()), 'submitted_at' => $time($task->submitted_at), 'completed_at' => $time($task->completed_at), 'excluded' => $task->excluded ? 'Yes' : 'No', 'payment_update' => $task->payment_update_flag ? 'Yes' : 'No'];
+    }
+
+    public function stillAccessible(User $actor, array $snapshot): bool
+    {
+        $actor = User::query()->find($actor->id);
+        if (! $actor) {
+            return false;
+        }
+        try {
+            $this->authorize($actor, true);
+            if ($snapshot['criteria']['family'] === 'verification') {
+                Gate::forUser($actor)->authorize('tasks.verify');
+            }
+
+            return app(TaskAccess::class)->scope(Task::query(), $actor)->whereIn('public_id', $snapshot['task_ids'])->count() === count($snapshot['task_ids']);
+        } catch (AuthorizationException|HttpException) {
+            return false;
+        }
+    }
+}

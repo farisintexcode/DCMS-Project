@@ -1,4 +1,4 @@
-<x-layouts.guest :title="$portal === 'rider' ? 'Rider sign in' : 'Admin sign in'">
+<x-layouts.guest :card="true" :rider="$portal === 'rider'" :description="$portal === 'rider' ? 'Access your assignments and keep things moving.' : 'Use your staff account to continue securely.'" :title="$portal === 'rider' ? 'Rider sign in' : 'Admin sign in'">
     <form method="POST" action="{{ route($portal === 'rider' ? 'rider.login.store' : 'login.store') }}" class="grid gap-5" x-data="{ submitting: false }" @submit="submitting = true">
         @csrf
         <x-input name="email" label="Email" type="email" :value="old('email')" autocomplete="username" required maxlength="254" autofocus />

@@ -46,6 +46,7 @@ test('Rider clocks a real shift, requests correction and Admin independently app
     await expect(historical.getByText('Pending Correction',{exact:true})).toBeVisible();
     await page.screenshot({path:'.local-tools/m10-'+surface+'-rider.png',fullPage:true});
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();
+    await page.getByRole('button',{name:'Menu',exact:true}).click();
     await page.getByRole('button',{name:'Sign out',exact:true}).first().click();
     await page.goto('/login');
     await page.getByLabel('Email',{exact:true}).fill(admin!);

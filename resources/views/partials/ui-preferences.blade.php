@@ -7,7 +7,7 @@
     const appearance = () => {
         const dark = ['light', 'dark'].includes(preference) ? preference === 'dark' : system.matches;
         document.documentElement.classList.toggle('dark', dark);
-        document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#171819' : '#ffffff');
+        document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#082838' : '#ffffff');
         window.dispatchEvent(new CustomEvent('dcms-theme', { detail: dark }));
     };
     window.dcmsToggleTheme = () => {
@@ -20,10 +20,10 @@
     window.addEventListener('storage', event => { if (event.key === 'dcms.theme' || event.key === null) { preference = read('dcms.theme'); appearance(); } });
     window.dcmsWorkspace = (portal = 'admin') => ({
         menuOpen: false, compact: portal === 'admin' && read('dcms.sidebar') === 'compact',
-        desktop: matchMedia('(min-width: 1024px)').matches, query: '', tooltip: '', tooltipTop: 0, tooltipLeft: 0, touchStart: null,
+        desktop: portal === 'admin' && matchMedia('(min-width: 1024px)').matches, query: '', tooltip: '', tooltipTop: 0, tooltipLeft: 0, touchStart: null,
         get rail() { return portal === 'admin' && this.desktop && this.compact; },
         resize() {
-            this.desktop = matchMedia('(min-width: 1024px)').matches;
+            this.desktop = portal === 'admin' && matchMedia('(min-width: 1024px)').matches;
             if (this.desktop) this.menuOpen = false;
             this.tooltip = '';
         },

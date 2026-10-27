@@ -32,7 +32,7 @@ class EmailTransport
         } catch (\Throwable) {
             return ['state' => 'deferred'];
         }
-        $payload = ['FromEmailAddress' => 'DebtOps <'.$account->sender_reference_ciphertext.'>', 'Destination' => ['ToAddresses' => [$message->recipient_ciphertext]], 'Content' => ['Simple' => ['Subject' => ['Data' => $message->subject_ciphertext, 'Charset' => 'UTF-8'], 'Body' => ['Text' => ['Data' => $message->body_ciphertext, 'Charset' => 'UTF-8']]]], 'EmailTags' => [['Name' => 'debtops_attempt', 'Value' => $attempt->request_key]]];
+        $payload = ['FromEmailAddress' => 'Nexora <'.$account->sender_reference_ciphertext.'>', 'Destination' => ['ToAddresses' => [$message->recipient_ciphertext]], 'Content' => ['Simple' => ['Subject' => ['Data' => $message->subject_ciphertext, 'Charset' => 'UTF-8'], 'Body' => ['Text' => ['Data' => $message->body_ciphertext, 'Charset' => 'UTF-8']]]], 'EmailTags' => [['Name' => 'debtops_attempt', 'Value' => $attempt->request_key]]];
         $configuration = $account->capabilities['configuration_set'] ?? config('communications.ses_configuration_set');
         if (is_string($configuration) && preg_match('/^[A-Za-z0-9_-]{1,64}$/D', $configuration)) {
             $payload['ConfigurationSetName'] = $configuration;

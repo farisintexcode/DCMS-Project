@@ -1,15 +1,15 @@
-<section class="grid min-w-0 gap-5">
+<section class="rider-page rider-task-detail">
 <x-feedback />
 @if($notice)<div role="status" class="break-words rounded-2xl border border-green-200 bg-green-50 p-4 text-sm text-green-900">{{ $notice }}</div>@endif
-<a href="{{ route('rider.tasks.index') }}" class="inline-flex min-h-11 items-center gap-2 text-sm font-semibold"><x-icon name="arrow-left" class="size-4" />My Tasks</a>
-<div class="surface grid gap-4 p-5"><div class="flex flex-wrap gap-2"><x-badge tone="brand">{{ $task->work_status==='submitted'?'Pending Verification':ucfirst(str_replace('_',' ',$task->work_status)) }}</x-badge><x-badge>{{ ucfirst($task->priority_code) }}</x-badge></div><h1 class="text-2xl font-semibold tracking-tight">Task details</h1><p class="text-lg font-medium">{{ $task->customer->display_name_ciphertext }}</p><p class="text-sm text-ink-600">Account {{ $task->account->account_number }} · {{ $task->batch->name }}</p><p class="text-xs text-ink-500">Due {{ $task->effectiveDue()->timezone(config('dcms.business_timezone'))->format('d M Y · H:i') }} MYT</p>
+<a href="{{ route('rider.tasks.index') }}" class="rider-back-link"><x-icon name="arrow-left" class="size-4" />My Tasks</a>
+<div class="surface rider-task-summary grid gap-4 p-5"><div class="flex flex-wrap gap-2"><x-badge tone="brand">{{ $task->work_status==='submitted'?'Pending Verification':ucfirst(str_replace('_',' ',$task->work_status)) }}</x-badge><x-badge>{{ ucfirst($task->priority_code) }}</x-badge></div><h1 class="text-2xl font-semibold tracking-tight">Task details</h1><p class="text-lg font-medium">{{ $task->customer->display_name_ciphertext }}</p><p class="text-sm text-ink-600">Account {{ $task->account->account_number }} · {{ $task->batch->name }}</p><p class="text-xs text-ink-500">Due {{ $task->effectiveDue()->timezone(config('dcms.business_timezone'))->format('d M Y · H:i') }} MYT</p>
 @if($task->review_status==='returned')<div role="status" class="rounded-xl bg-red-50 p-4 text-sm text-red-900"><strong>Returned for correction</strong><p class="mt-2 whitespace-pre-line">{{ $returnReason??'Review the correction instructions with your Admin.' }}</p></div>@endif
 @if($task->work_status==='unstarted'||$task->review_status==='returned')
 @can('execute',$task)<x-button type="button" wire:click="start" wire:loading.attr="disabled">{{ $task->review_status==='returned'?'Start correction':'Start Task' }}</x-button>@endcan
 @endif
 @if($task->lock_version!==$version)<p role="alert" class="text-sm text-red-800">This task changed. <a href="{{ route('rider.tasks.show',$task) }}" class="underline">Reload before saving</a>. Your input is still shown here.</p>@endif
 </div>
-<nav aria-label="Task sections" class="flex max-w-full gap-2 overflow-x-auto pb-2">
+<nav aria-label="Task sections" class="rider-task-sections">
 @foreach(['overview'=>'Overview','customer'=>'Customer','visit'=>'Visit & remarks','business'=>'Business','proof'=>'Proof','history'=>'History'] as $key=>$label)
 <button type="button" wire:click="$set('section','{{ $key }}')" @class(['btn shrink-0 text-xs','btn-primary'=>$section===$key,'btn-secondary'=>$section!==$key]) @if($section===$key) aria-current="page" @endif>{{ $label }}</button>
 @endforeach</nav>
@@ -75,5 +75,5 @@
 <div class="surface grid gap-4 p-5"><h2 class="text-lg font-semibold">Your task history</h2>@foreach($submissions as $submission)<a href="{{ route('rider.tasks.history',$submission) }}" class="grid gap-2 rounded-xl bg-brand-soft p-4 text-sm"><strong>Submission {{ $submission->submission_version }} · immutable</strong><span class="break-all text-xs">{{ $submission->public_id }}</span><span>{{ $submission->submitted_at->timezone(config('dcms.business_timezone'))->format('d M Y · H:i') }} MYT</span></a>@endforeach
 @forelse($visits as $visit)<article class="grid gap-2 border-b border-ink-100 py-3 text-sm"><strong>Site visit · {{ $visit->outcome_code }}</strong><span class="text-xs text-ink-500">{{ $visit->occurred_at->timezone(config('dcms.business_timezone'))->format('d M Y · H:i') }} MYT</span><p class="whitespace-pre-line">{{ $visit->visit_remarks_ciphertext }}</p></article>@empty<p class="text-sm text-ink-500">No visits recorded by you.</p>@endforelse<p class="text-xs text-ink-500">Showing your latest 30 visits and 20 submissions. Previous versions remain stored.</p></div>
 @endif
-@if($editable && $section!=='completion')<div class="sticky bottom-24 z-10 rounded-2xl border border-brand-primary/30 bg-white/95 p-3 shadow-lg backdrop-blur"><x-button type="button" wire:click="reviewCompletion" wire:loading.attr="disabled" class="w-full">Review completion checklist<x-icon name="arrow-right" class="size-4" /></x-button></div>@endif
+@if($editable && $section!=='completion')<div class="rider-completion-bar sticky bottom-24 z-10 rounded-2xl border border-brand-primary/30 bg-white/95 p-3 shadow-lg backdrop-blur"><x-button type="button" wire:click="reviewCompletion" wire:loading.attr="disabled" class="w-full">Review completion checklist<x-icon name="arrow-right" class="size-4" /></x-button></div>@endif
 </section>

@@ -1,29 +1,17 @@
-<section class="grid min-w-0 gap-5">
+<section class="rider-page">
 <x-feedback />
-<div><p class="eyebrow">Field workspace</p><h1 class="mt-2 text-2xl font-semibold tracking-tight">My Tasks</h1><p class="mt-2 text-sm text-ink-600">Your assigned work, next actions and submission receipts.</p></div>
-<form wire:submit="$refresh" class="surface grid min-w-0 gap-4 p-5 sm:grid-cols-2">
-<x-select name="status" label="View" wire:model.live="status">@foreach(['pending'=>'Pending work','today'=>"Today's tasks",'all'=>'All current assignments','assigned'=>'Assigned · not started','in_progress'=>'In progress','returned'=>'Returned for correction','submitted'=>'Pending verification','completed'=>'Completed','history'=>'My submission history'] as $code=>$label)<option value="{{ $code }}">{{ $label }}</option>@endforeach</x-select>
-<x-input name="query" label="Account or customer reference" wire:model="query" placeholder="Exact reference" />
-<x-input name="batch" label="Batch reference" wire:model="batch" />
-<x-input name="due" type="date" label="Due date (MYT)" wire:model="due" class="min-w-0 max-w-full" />
-<div class="flex flex-wrap gap-2 sm:col-span-2"><x-button type="submit" variant="secondary">Search</x-button><x-button type="button" variant="secondary" wire:click="clearFilters">Clear filters</x-button></div>
+<x-page-header title="My Tasks" eyebrow="Your field work" description="Find your next task, continue a visit or review your submissions." />
+<nav aria-label="Task views" class="rider-view-tabs">@foreach(['pending'=>'Pending work','all'=>'All tasks','history'=>'History'] as $value=>$label)<a href="{{ route('rider.tasks.index',array_filter(['status'=>$value,'batch'=>$batch,'due'=>$due])) }}" @if($status===$value) aria-current="page" @endif>{{ $label }}</a>@endforeach</nav>
+<form wire:submit="$refresh" class="surface rider-search-panel">
+<div class="rider-search-row"><div class="min-w-0 flex-1"><x-input name="query" label="Account or customer reference" wire:model="query" placeholder="Search an exact reference" /></div><x-button type="submit" variant="secondary"><x-icon name="search" class="size-4" /><span class="sr-only sm:not-sr-only">Search</span></x-button></div>
+<details class="rider-filter-details" @if($batch!==''||$due!=='') open @endif><summary><span><x-icon name="filter" class="size-4" />Search & filters</span><x-icon name="chevron" class="size-4" /></summary><div class="grid min-w-0 gap-4 pt-4 sm:grid-cols-2"><x-select name="status" label="View" wire:model.live="status">@foreach(['pending'=>'Pending work','today'=>"Today's tasks",'all'=>'All current assignments','assigned'=>'Assigned · not started','in_progress'=>'In progress','returned'=>'Returned for correction','submitted'=>'Pending verification','completed'=>'Completed','history'=>'My submission history'] as $code=>$label)<option value="{{ $code }}">{{ $label }}</option>@endforeach</x-select><x-input name="batch" label="Batch reference" wire:model="batch" /><x-input name="due" type="date" label="Due date (MYT)" wire:model="due" class="min-w-0 max-w-full" /><div class="flex items-end"><x-button type="button" variant="secondary" wire:click="clearFilters">Clear filters</x-button></div></div></details>
 </form>
-<div wire:loading.delay role="status" class="rounded-xl bg-brand-soft p-3 text-sm">Updating your task list…</div>
+<div wire:loading.delay role="status" class="rider-context-note"><span class="loading-spinner"></span>Updating your task list…</div>
 @if($status==='history')
-<p class="text-xs leading-5 text-ink-500">Receipts contain only your own submission references and timestamps. Customer data and proof stay protected after reassignment.</p>
-@forelse($history as $submission)
-<a href="{{ route('rider.tasks.history',$submission) }}" class="surface grid gap-2 p-5 transition hover:border-brand-primary"><span class="font-semibold">Submission {{ $submission->submission_version }}</span><span class="break-all text-xs text-ink-600">{{ $submission->public_id }}</span><span class="text-xs">{{ $submission->submitted_at->timezone(config('dcms.business_timezone'))->format('d M Y · H:i') }} MYT</span></a>
-@empty<x-empty-state title="No submission history" message="Your submitted work will appear here." />@endforelse
-{{ $history->links() }}
+<p class="rider-data-note">Receipts contain only your own submission references and timestamps. Customer data and proof stay protected after reassignment.</p>
+<div class="rider-card-grid">@forelse($history as $submission)<a href="{{ route('rider.tasks.history',$submission) }}" class="surface rider-receipt-card"><span class="rider-record-icon"><x-icon name="shield" /></span><div class="min-w-0"><h2>Submission {{ $submission->submission_version }}</h2><p class="mt-1 break-all text-[11px] text-ink-500">{{ $submission->public_id }}</p><time class="mt-2 block text-xs">{{ $submission->submitted_at->timezone(config('dcms.business_timezone'))->format('d M Y · H:i') }} MYT</time></div><x-icon name="chevron" class="size-4" /></a>@empty<div class="md:col-span-2"><x-empty-state title="No submission history" message="Your submitted work will appear here." icon="shield" /></div>@endforelse</div>{{ $history->links() }}
 @else
-@forelse($tasks as $task)
-<article class="surface grid min-w-0 gap-4 p-5" wire:key="rider-task-{{ $task->public_id }}">
-<div class="flex flex-wrap items-center justify-between gap-2"><x-badge :tone="$task->review_status==='returned'?'danger':'brand'">{{ $task->review_status==='returned'?'Returned for correction':($task->work_status==='submitted'?'Pending verification':str_replace('_',' ',ucfirst($task->work_status))) }}</x-badge><x-badge>{{ ucfirst($task->priority_code) }}</x-badge></div>
-<div><h2 class="text-lg font-semibold">{{ $task->customer->display_name_ciphertext }}</h2><p class="mt-1 break-words text-sm text-ink-600">{{ $task->account->account_number }} · {{ $task->batch->name }}</p></div>
-<dl class="grid grid-cols-2 gap-3 border-t border-ink-100 pt-4 text-xs"><div><dt class="text-ink-500">Planned visit</dt><dd class="mt-1 font-medium">{{ $task->scheduled_visit_at?->timezone(config('dcms.business_timezone'))->format('d M · H:i')??'Not scheduled' }}</dd></div><div><dt class="text-ink-500">Due · MYT</dt><dd class="mt-1 font-medium">{{ $task->effectiveDue()->timezone(config('dcms.business_timezone'))->format('d M · H:i') }}</dd></div></dl>
-<a href="{{ route('rider.tasks.show',$task) }}" class="btn btn-primary w-full"><x-icon name="arrow-right" class="size-4" />View Task</a>
-</article>
-@empty<x-empty-state title="No tasks in this view" message="Try another filter. Your Admin assigns work and client access." />@endforelse
-{{ $tasks->links() }}
+<div class="rider-section-heading"><h2>{{ $status==='pending'?'Your pending work':'Tasks in this view' }}</h2><span>{{ $tasks->total() }} {{ $tasks->total()===1?'task':'tasks' }}</span></div>
+<div class="rider-card-grid">@forelse($tasks as $task)<x-rider.task-card :task="$task" />@empty<div class="md:col-span-2"><x-empty-state title="No tasks in this view" message="Try another filter. Your Admin assigns work and client access." icon="clipboard" /></div>@endforelse</div>{{ $tasks->links() }}
 @endif
 </section>

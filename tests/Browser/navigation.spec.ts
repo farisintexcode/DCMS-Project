@@ -14,9 +14,9 @@ async function signIn(page: Page, rider = false) {
 test('theme follows the system and remembers a manual choice on public pages', async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
     await page.goto('/login');
-    await expect(page).toHaveTitle('Admin sign in | DebtOps');
-    await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', /\/images\/brand\/debtops-icon-transparent\.png$/);
-    await expect(page.locator('.debtops-logo-full img').first()).toHaveAttribute('src', /\/images\/brand\/debtops-logo\.png$/);
+    await expect(page).toHaveTitle('Admin sign in | Nexora');
+    await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', /\/images\/brand\/nexora-browser-32\.png(?:\?v=navy3)?$/);
+    await expect(page.locator('.nexora-logo-full img').first()).toHaveAttribute('src', /\/images\/brand\/nexora-logo-(light|dark)\.svg$/);
     await expect(page.locator('html')).toHaveClass(/dark/);
     await page.getByRole('button', { name: 'Switch to light mode', exact: true }).click();
     await expect(page.locator('html')).not.toHaveClass(/dark/);
@@ -26,7 +26,7 @@ test('theme follows the system and remembers a manual choice on public pages', a
     await expect(page.locator('html')).not.toHaveClass(/dark/);
     await page.getByRole('button', { name: 'Switch to dark mode', exact: true }).click();
     await expect(page.locator('html')).toHaveClass(/dark/);
-    await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toHaveCSS('color', 'rgb(17, 17, 17)');
+    await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toHaveCSS('color', 'rgb(2, 48, 71)');
     await page.screenshot({ path: test.info().outputPath('dark-login.png'), fullPage: true });
 });
 
@@ -43,19 +43,26 @@ test('Admin navigation supports search groups collapse tooltips and mobile keybo
         await expect(page.getByRole('button', { name: 'Close menu', exact: true })).toBeFocused();
         await expect(page.locator('#main-content')).toHaveJSProperty('inert', true);
         await page.keyboard.press('Shift+Tab');
-        await expect(sidebar.getByRole('link', { name: 'DebtOps home', exact: true })).toBeFocused();
+        await expect(sidebar.getByRole('link', { name: 'Nexora home', exact: true })).toBeFocused();
         await page.keyboard.press('Escape');
         await expect(page.getByRole('button', { name: 'Menu', exact: true })).toBeFocused();
         await page.getByRole('button', { name: 'Menu', exact: true }).click();
     }
+    const fullPanel = await sidebar.boundingBox();
+    expect(fullPanel!.x).toBe(0);
+    expect(fullPanel!.y).toBe(0);
+    expect(fullPanel!.height).toBe(page.viewportSize()!.height);
+    const footer = await sidebar.locator('.sidebar-footer').boundingBox();
+    expect(footer!.y + footer!.height).toBeCloseTo(page.viewportSize()!.height, 0);
+    await expect(sidebar).toHaveCSS('border-radius', '0px');
     await sidebar.getByRole('button', { name: 'Customer management', exact: true }).click();
     await sidebar.getByRole('link', { name: 'Customer categories', exact: true }).click();
     await expect(page).toHaveURL(/\/admin\/customers\/categories$/);
     if (!desktop) await page.getByRole('button', { name: 'Menu', exact: true }).click();
     await expect(sidebar.getByRole('link', { name: 'Customer categories', exact: true })).toHaveAttribute('aria-current', 'page');
     await expect(sidebar.getByRole('button', { name: 'Customer management', exact: true })).toHaveAttribute('aria-expanded', 'true');
-    await sidebar.getByRole('searchbox', { name: 'Search navigation', exact: true }).fill('riders');
-    await expect(sidebar.getByRole('link', { name: 'Riders & staff', exact: true })).toBeVisible();
+    await sidebar.getByRole('searchbox', { name: 'Search navigation', exact: true }).fill('staff');
+    await expect(sidebar.getByRole('link', { name: 'Staff Management', exact: true })).toBeVisible();
     await expect(sidebar.getByRole('link', { name: 'Customer categories', exact: true })).toBeHidden();
     await sidebar.getByRole('searchbox', { name: 'Search navigation', exact: true }).fill('not-a-module');
     await expect(sidebar.getByRole('status')).toContainText('No matching pages');
@@ -63,13 +70,13 @@ test('Admin navigation supports search groups collapse tooltips and mobile keybo
     if (desktop) {
         await sidebar.getByRole('button', { name: 'Collapse sidebar', exact: true }).click();
         await expect(page.locator('body')).toHaveClass(/sidebar-compact/);
-        await expect(sidebar.locator('.debtops-logo-icon')).toBeVisible();
-        await expect(sidebar.locator('.debtops-logo-full')).toBeHidden();
+        await expect(sidebar.locator('.nexora-logo-icon')).toBeVisible();
+        await expect(sidebar.locator('.nexora-logo-full')).toBeHidden();
         const railBox = await sidebar.boundingBox();
         const headerBox = await page.locator('header').boundingBox();
         expect(headerBox!.x).toBeGreaterThanOrEqual(railBox!.x + railBox!.width);
-        await sidebar.getByRole('link', { name: 'Riders & staff', exact: true }).focus();
-        await expect(page.getByRole('tooltip')).toHaveText('Riders & staff');
+        await sidebar.getByRole('button', { name: 'Human Resources', exact: true }).focus();
+        await expect(page.getByRole('tooltip')).toHaveText('Human Resources');
         await page.screenshot({ path: test.info().outputPath('compact-navigation.png'), fullPage: true });
         await page.reload();
         await expect(page.locator('body')).toHaveClass(/sidebar-compact/);
@@ -90,21 +97,22 @@ test('Admin navigation supports search groups collapse tooltips and mobile keybo
     expect(errors).toEqual([]);
 });
 
-test('Rider keeps Account in the bottom navigation and Sign out in the header', async ({ page }) => {
+test('Rider uses four bottom destinations profile in the header and logout in the side menu', async ({ page }) => {
     await signIn(page, true);
-    await expect(page.locator('header').getByRole('button', { name: 'Sign out', exact: true })).toBeVisible();
-    await expect(page.getByRole('navigation', { name: 'Rider navigation', exact: true }).getByRole('link', { name: 'Account', exact: true })).toBeVisible();
-    await expect(page.locator('#rider-navigation').getByRole('link', { name: 'Customers', exact: true })).toHaveCount(0);
-    await page.getByRole('button', { name: 'Switch to dark mode', exact: true }).click();
+    const navigation = page.getByRole('navigation', { name: 'Rider navigation', exact: true });
+    await expect(navigation.getByRole('link')).toHaveText(['Home','Assignment','My Task','Attendance']);
+    await expect(page.locator('header').getByRole('link',{name:'Profile',exact:true})).toBeVisible();
+    await expect(page.locator('header').getByRole('button',{name:'Sign out',exact:true})).toHaveCount(0);
+    await page.getByRole('button',{name:'Menu',exact:true}).click();
+    const sidebar=page.getByRole('dialog',{name:'Rider sidebar',exact:true});
+    await expect(sidebar.getByRole('button',{name:'Sign out',exact:true})).toBeVisible();
+    await expect(page.getByRole('button',{name:'Close menu',exact:true})).toBeFocused();
+    await page.getByRole('button',{name:'Switch to dark mode',exact:true}).click();
     await expect(page.locator('html')).toHaveClass(/dark/);
-    if (test.info().project.name === 'rider-mobile') {
-        await page.getByRole('button', { name: 'Menu', exact: true }).click();
-        await expect(page.getByRole('dialog', { name: 'Rider sidebar', exact: true })).toBeVisible();
-        await page.screenshot({ path: test.info().outputPath('dark-rider-drawer.png'), fullPage: true });
-        await page.keyboard.press('Escape');
-        await expect(page.getByRole('button', { name: 'Menu', exact: true })).toBeFocused();
-    }
+    await page.screenshot({path:test.info().outputPath('dark-rider-drawer.png'),fullPage:true});
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('button',{name:'Menu',exact:true})).toBeFocused();
     await page.reload();
     await expect(page.locator('html')).toHaveClass(/dark/);
-    await page.screenshot({ path: test.info().outputPath('dark-rider.png'), fullPage: true });
+    await page.screenshot({path:test.info().outputPath('dark-rider.png'),fullPage:true});
 });

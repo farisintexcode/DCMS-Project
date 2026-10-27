@@ -15,7 +15,7 @@ class BootstrapAdmin extends Command
 {
     protected $signature = 'dcms:bootstrap-admin {email} {--name=Administrator}';
 
-    protected $description = 'Provision the first local DebtOps Admin with a prompted password';
+    protected $description = 'Provision the first local Nexora Admin with a prompted password';
 
     public function handle(AuditWriter $audit): int
     {

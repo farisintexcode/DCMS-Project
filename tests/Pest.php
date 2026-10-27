@@ -17,6 +17,7 @@ function customerOperator(): array
     $scope->client_id = $client->id;
     $scope->granted_by = $user->id;
     $scope->reason = 'Synthetic customer test scope';
+    $scope->valid_from = now()->subMinute();
     $scope->save();
 
     return [$user, $client];

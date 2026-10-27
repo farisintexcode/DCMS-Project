@@ -43,7 +43,7 @@ class ApplySesReceipt
                 return $this->defer($event, 'malformed_message_context', true);
             }
             $source = $mail['source'] ?? null;
-            if (is_string($source) && preg_match('/^DebtOps <([^<>]+)>$/D', $source, $m)) {
+            if (is_string($source) && preg_match('/^(?:Nexora|DebtOps) <([^<>]+)>$/D', $source, $m)) {
                 $source = $m[1];
             }
             if (! is_string($source) || $this->email->canonical($source) !== $this->email->canonical($event->account->sender_reference_ciphertext ?? '') || ($mail['sendingAccountId'] ?? null) !== ($event->account->capabilities['aws_account_id'] ?? null) || ! preg_match('/^[0-9]{12}$/D', $mail['sendingAccountId'] ?? '')) {

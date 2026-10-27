@@ -3,11 +3,16 @@
 /** Plan.md §4; Module.md M01/M12; production grants require business sign-off. */
 return [
     'branding' => [
-        'name' => 'DebtOps',
+        'name' => 'Nexora',
         'system_name' => 'Debt Collection Management System',
         'developer' => 'InteXcode',
-        'logo' => 'images/brand/debtops-logo.png',
-        'icon' => 'images/brand/debtops-icon-transparent.png',
+        'logo' => 'images/brand/nexora-logo-light.svg',
+        'logo_dark' => 'images/brand/nexora-logo-dark.svg',
+        'icon' => 'images/brand/nexora-icon-light.svg',
+        'icon_dark' => 'images/brand/nexora-icon-dark.svg',
+        'icon_png' => 'images/brand/nexora-icon-light.png',
+        'favicon' => 'images/brand/nexora-browser-32.png',
+        'apple_touch_icon' => 'images/brand/nexora-app-180.png',
     ],
     'e2e_password' => env('DCMS_E2E_PASSWORD'),
     'search_key' => env('DCMS_SEARCH_KEY'),

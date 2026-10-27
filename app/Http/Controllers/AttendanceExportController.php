@@ -47,6 +47,6 @@ class AttendanceExportController extends Controller
                 fputcsv($stream, array_map(fn ($value): string => preg_match('/^[\s]*[=+@\-\t\r\n]/u', (string) $value) ? "'".$value : (string) $value, $values), escape: '');
             }
             fclose($stream);
-        }, 'debtops-attendance-'.$asOf->format('Ymd-His').'.csv', [...$headers, 'Content-Type' => 'text/csv; charset=UTF-8']);
+        }, 'nexora-attendance-'.$asOf->format('Ymd-His').'.csv', [...$headers, 'Content-Type' => 'text/csv; charset=UTF-8']);
     }
 }
