@@ -1,1 +1,1 @@
-//
+import './profile-photo';

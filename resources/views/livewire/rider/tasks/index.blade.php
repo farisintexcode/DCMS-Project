@@ -1,6 +1,6 @@
 <section class="rider-page">
 <x-feedback />
-<x-page-header title="My Tasks" eyebrow="Your field work" description="Find your next task, continue a visit or review your submissions." />
+<x-page-header title="My Tasks" eyebrow="" description="Find your next task, continue a visit or review your submissions." />
 <nav aria-label="Task views" class="rider-view-tabs">@foreach(['pending'=>'Pending work','all'=>'All tasks','history'=>'History'] as $value=>$label)<a href="{{ route('rider.tasks.index',array_filter(['status'=>$value,'batch'=>$batch,'due'=>$due])) }}" @if($status===$value) aria-current="page" @endif>{{ $label }}</a>@endforeach</nav>
 <form wire:submit="$refresh" class="surface rider-search-panel">
 <div class="rider-search-row"><div class="min-w-0 flex-1"><x-input name="query" label="Account or customer reference" wire:model="query" placeholder="Search an exact reference" /></div><x-button type="submit" variant="secondary"><x-icon name="search" class="size-4" /><span class="sr-only sm:not-sr-only">Search</span></x-button></div>

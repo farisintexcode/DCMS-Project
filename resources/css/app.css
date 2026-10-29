@@ -30,6 +30,18 @@
 }
 
 [x-cloak] { display: none !important; }
+
+/* M01 / UI05: a compact editor shared by Admin and Rider account avatars. */
+@layer components {
+    .profile-photo-edit { @apply absolute -right-1 -bottom-1 grid size-9 place-items-center rounded-full border-2 border-white bg-brand-accent text-brand-primary shadow-sm transition hover:bg-brand-accent-hover active:scale-95; }
+    .profile-photo-dialog { @apply fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-md overflow-hidden rounded-2xl border border-ink-200 shadow-2xl; background: var(--surface); color: var(--foreground); }
+    .profile-photo-dialog::backdrop { background: rgb(2 48 71 / 55%); backdrop-filter: blur(3px); }
+    .profile-photo-preview { @apply relative mx-auto size-40 shrink-0 overflow-hidden rounded-full border-4 border-white bg-brand-soft shadow-sm sm:size-44; }
+    .profile-photo-preview img { position: absolute; max-width: none; object-fit: fill; }
+    .profile-photo-range { @apply min-h-8 w-full cursor-pointer; accent-color: var(--color-brand-accent); }
+    .dark .profile-avatar, .dark .profile-photo-preview { border-color: var(--surface-raised); }
+    .dark .profile-photo-edit { border-color: var(--surface); }
+}
 @layer base {
     :root { color-scheme: light; --surface: #ffffff; --foreground: #023047; --focus-color: #023047; --surface-raised: #ffffff; }
     :focus-visible { outline: 2px solid var(--focus-color); outline-offset: 4px; }
@@ -276,7 +288,7 @@
     .rider-header-brand .nexora-logo-icon, .rider-header-brand .nexora-logo-icon img { width: 2.5rem; height: 2.5rem; }
     .rider-brand-label { @apply text-base leading-5 font-bold tracking-tight; }
     .rider-brand-label > span { @apply block text-[9px] leading-4 font-medium tracking-normal text-ink-500; }
-    .rider-avatar { @apply grid size-11 shrink-0 place-items-center rounded-2xl border-2 border-brand-accent bg-brand-primary text-sm font-semibold text-white; }
+    .rider-avatar { @apply grid size-11 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-brand-accent bg-brand-primary text-sm font-semibold text-white; }
     .rider-main { @apply mx-auto grid min-w-0 max-w-5xl gap-6 px-4 pt-6 sm:px-6 sm:pt-8; padding-bottom: calc(7rem + env(safe-area-inset-bottom)); }
     .rider-page { @apply grid min-w-0 gap-5 sm:gap-6; }
     .rider-workspace .page-heading { @apply text-2xl leading-tight sm:text-3xl; }
@@ -303,12 +315,14 @@
     .rider-greeting h1 { @apply mt-2 text-2xl leading-tight font-semibold tracking-tight; }
     .rider-greeting p:last-child { @apply mt-2 text-xs leading-5 text-ink-500; }
     .rider-greeting-icon { @apply hidden size-12 shrink-0 place-items-center rounded-2xl border border-ink-200 text-ink-400 sm:grid; }
+    .rider-meta { @apply text-xs leading-5 text-ink-500; }
     .rider-kicker { @apply text-[10px] leading-5 font-semibold tracking-[.12em] text-ink-500 uppercase; }
+    .rider-workspace .rider-kicker { @apply text-xs font-normal tracking-normal normal-case; }
     .rider-dashboard-top { @apply grid min-w-0 gap-4 md:grid-cols-2; }
     .rider-focus-card { @apply relative grid min-w-0 content-start gap-4 overflow-hidden rounded-3xl p-5 sm:p-6; background: var(--color-brand-primary); color: #fff; }
     .rider-focus-card::after { content: ''; position: absolute; width: 10rem; height: 10rem; border: 1px solid rgb(255 255 255 / 7%); border-radius: 50%; top: -5rem; right: -4rem; pointer-events: none; }
-    .rider-focus-label { @apply inline-flex items-center gap-2 text-[10px] font-semibold tracking-wider uppercase; color: #c8dce6; }
-    .rider-focus-label > span { @apply size-1.5 rounded-full bg-brand-accent; }
+
+
     .rider-focus-card h2 { @apply text-xl leading-7 font-semibold tracking-tight sm:text-2xl; }
     .rider-focus-card > p { @apply text-sm leading-6; color: #e1edf4; }
     .rider-focus-batch { @apply -mt-2 text-[11px] leading-5; color: #b4cbd8; }
@@ -531,4 +545,102 @@
     .rider-header a:focus-visible, .rider-header button:focus-visible { outline: 2px solid #FB8500; outline-offset: 3px; }
     .rider-header .nexora-brand .nexora-on-light { display: none; }
     .rider-header .nexora-brand .nexora-on-dark { display: block; }
+}
+
+@layer components {
+ .nexora-attendance { width: 100%; }
+ .attendance-welcome { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; }
+ .attendance-welcome h1 { margin: .35rem 0 .5rem; font-size: clamp(1.6rem, 4vw, 2rem); font-weight: 700; letter-spacing: -.04em; }
+ .attendance-history-shortcut { display: inline-flex; align-items: center; gap: .5rem; min-height: 2.75rem; padding: .5rem .75rem; border: 1px solid var(--color-ink-200); border-radius: .85rem; font-size: .75rem; font-weight: 600; background: var(--surface); }
+ .attendance-icon { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; flex-shrink: 0; border: 1px solid var(--color-ink-200); background: var(--color-brand-soft); color: var(--color-brand-primary); border-radius: .85rem; }
+ .attendance-date-card { display: flex; align-items: center; gap: .9rem; padding: 1rem; background: var(--color-brand-soft); border: 1px solid var(--color-ink-200); border-radius: 1rem; }
+ .attendance-current { display: grid; gap: 1.25rem; padding: clamp(1.15rem, 4vw, 2rem); background: linear-gradient(155deg, var(--surface) 25%, var(--color-brand-accent-soft)); }
+ .attendance-current-heading { display: grid; justify-items: center; gap: .7rem; text-align: center; }
+ .attendance-status-icon { display: grid; place-items: center; width: 3rem; height: 3rem; border-radius: 1rem; background: var(--color-brand-accent-soft); color: #a64e00; }
+ .attendance-current-heading h2 { font-size: 1.4rem; font-weight: 700; letter-spacing: -.035em; }
+ .attendance-context { font-size: .8rem; line-height: 1.7; text-align: center; color: var(--color-ink-600); }
+ .attendance-punch-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .75rem; }
+ .attendance-inactive-action { display: flex; justify-content: center; align-items: center; gap: .5rem; min-height: 3.5rem; padding: .75rem; border: 1px solid var(--color-ink-200); background: var(--color-ink-100); color: var(--color-ink-500); border-radius: .75rem; font-size: .85rem; font-weight: 600; }
+ .attendance-saved-note { grid-column: 1 / -1; display: flex; gap: .75rem; align-items: center; padding: 1rem; border: 1px solid var(--color-ink-200); background: var(--surface); border-radius: .85rem; font-size: .85rem; line-height: 1.6; }
+ .attendance-shift-times { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .75rem; text-align: center; }
+ .attendance-shift-times p { font-size: .75rem; color: var(--color-ink-500); }
+ .attendance-shift-times strong { display: block; margin-top: .35rem; font-size: 1rem; }
+ .attendance-shift-times span { display: block; margin-top: .25rem; font-size: .7rem; color: var(--color-ink-500); }
+ .attendance-recorded-times { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1rem; border-top: 1px solid var(--color-ink-200); padding-top: 1rem; }
+ .attendance-recorded-times dt { font-size: .7rem; color: var(--color-ink-500); }
+ .attendance-recorded-times dd { margin-top: .35rem; font-size: .8rem; font-weight: 600; overflow-wrap: anywhere; }
+ .attendance-policy-note { display: flex; align-items: flex-start; gap: .5rem; font-size: .7rem; line-height: 1.7; color: var(--color-ink-500); }
+ .attendance-history-section, .attendance-history-records { display: grid; gap: 1rem; min-width: 0; scroll-margin-top: 6rem; }
+ .attendance-history-filters { display: grid; gap: 1.25rem; padding: 1.25rem; min-width: 0; }
+ .attendance-history-record { padding: 1.25rem; min-width: 0; }
+ .attendance-record-heading, .attendance-record-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; }
+ .attendance-history-summary { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1rem; margin-block: 1.25rem; padding: 1rem; border-radius: .9rem; background: var(--color-brand-soft); }
+ .attendance-history-summary dt { display: flex; align-items: center; gap: .35rem; font-size: .65rem; color: var(--color-ink-500); }
+ .attendance-history-summary dd { margin-top: .4rem; font-size: .8rem; font-weight: 650; }
+ .attendance-history-details { border-top: 1px solid var(--color-ink-200); padding-block: 1rem; }
+ .attendance-history-details summary { display: flex; justify-content: space-between; gap: .5rem; cursor: pointer; min-height: 2rem; align-items: center; font-size: .75rem; font-weight: 600; }
+ .attendance-history-details[open] summary svg { transform: rotate(90deg); }
+ .attendance-record-footer { padding-top: 1rem; border-top: 1px solid var(--color-ink-200); }
+ .dark .attendance-current { background: var(--surface); }
+ .dark .attendance-status-icon { color: #ffac4d; }
+}
+@media (min-width: 640px) { .attendance-history-summary { grid-template-columns: repeat(3,minmax(0,1fr)); } }
+
+@layer components { .attendance-punch-actions .btn { padding-inline: .75rem; font-size: .85rem; gap: .4rem; } }
+
+@media (max-width: 639px) {
+
+ .attendance-welcome { flex-wrap: nowrap; align-items: flex-start; gap: .75rem; }
+ .attendance-welcome > div { min-width: 0; }
+ .attendance-welcome .rider-kicker { overflow-wrap: anywhere; }
+ .attendance-history-shortcut { width: 2.75rem; flex-shrink: 0; justify-content: center; padding: .5rem; }
+ .attendance-current-heading { gap: .5rem; }
+ .attendance-status-icon { width: 2.5rem; height: 2.5rem; border-radius: .85rem; }
+}
+
+/* Shared Rider sizing follows the Dashboard; feature pages inherit this contract. */
+@layer utilities {
+ .rider-workspace { --rider-content-width: 64rem; --rider-page-gutter: 1rem; --rider-top-spacing: 1.5rem; --rider-section-gap: 1.25rem; --rider-card-padding: 1.25rem; --rider-heading-size: 1.5rem; --rider-bottom-clearance: 7rem; }
+ .rider-workspace .rider-main { width: 100%; max-width: var(--rider-content-width); margin-inline: auto; padding-inline: var(--rider-page-gutter); padding-top: var(--rider-top-spacing); padding-bottom: calc(var(--rider-bottom-clearance) + env(safe-area-inset-bottom)); gap: var(--rider-section-gap); }
+ .rider-workspace .rider-header-inner { max-width: var(--rider-content-width); padding-inline: var(--rider-page-gutter); }
+ .rider-workspace .rider-main > :not(.rider-page-footer) { width: 100%; max-width: none; min-width: 0; margin-inline: 0; }
+ .rider-workspace .rider-page, .rider-workspace .rider-main > section, .rider-workspace .account-settings-page { gap: var(--rider-section-gap); }
+ .rider-workspace .rider-main h1 { font-size: var(--rider-heading-size); line-height: 1.25; font-weight: 600; letter-spacing: -.025em; }
+ .rider-workspace .attendance-welcome h1 { margin: .5rem 0; }
+ .rider-workspace .page-header > div:first-child > p:last-child:not(.eyebrow), .rider-workspace .attendance-welcome > div > p:last-child, .rider-workspace .rider-greeting p:last-child { font-size: .75rem; line-height: 1.25rem; }
+ .rider-workspace .rider-card, .rider-workspace .rider-focus-card, .rider-workspace .rider-search-panel, .rider-workspace .rider-batch-card, .rider-workspace .rider-task-card, .rider-workspace .rider-task-summary, .rider-workspace .rider-notification-card, .rider-workspace .attendance-current, .rider-workspace .attendance-history-filters, .rider-workspace .attendance-history-record, .rider-workspace .account-settings-page .surface { padding: var(--rider-card-padding); }
+ .rider-workspace .attendance-date-card { padding: var(--rider-card-padding); }
+ .rider-workspace .attendance-icon { width: 2.75rem; height: 2.75rem; }
+ .rider-workspace .attendance-current-heading h2 { font-size: 1.5rem; line-height: 1.75rem; font-weight: 600; }
+ .rider-workspace .attendance-current-grid { display: grid; min-width: 0; gap: var(--rider-section-gap); }
+ .rider-workspace .attendance-current-status, .rider-workspace .attendance-current-controls { display: grid; align-content: start; gap: 1.25rem; min-width: 0; }
+ .rider-workspace .attendance-context { font-size: .875rem; line-height: 1.5rem; }
+ .rider-workspace .attendance-policy-note { font-size: .75rem; line-height: 1.25rem; }
+ .rider-workspace .attendance-history-section, .rider-workspace .attendance-history-records { gap: var(--rider-section-gap); }
+ .rider-workspace .attendance-history-summary dt { font-size: .75rem; line-height: 1.25rem; }
+ .rider-workspace .attendance-history-summary dd, .rider-workspace .attendance-recorded-times dd { font-size: .875rem; line-height: 1.25rem; }
+}
+@media (min-width: 640px) {
+ .rider-workspace { --rider-page-gutter: 1.5rem; --rider-top-spacing: 2rem; --rider-section-gap: 1.5rem; --rider-card-padding: 1.5rem; }
+}
+@media (min-width: 1024px) {
+ .rider-workspace .attendance-current-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+ .rider-workspace .attendance-current-status { align-content: center; }
+ .rider-workspace .attendance-current-grid { gap: 2rem; }
+}
+
+/* Current-shift color treatment only; history and attendance controls retain their layout. */
+@layer utilities {
+ .nexora-attendance .attendance-current { background: #023047; color: #fff; border-color: rgb(255 255 255 / 15%); }
+ .nexora-attendance .attendance-current h2, .nexora-attendance .attendance-current .field-label, .nexora-attendance .attendance-current .attendance-shift-times strong, .nexora-attendance .attendance-current .attendance-recorded-times dd { color: #fff; }
+ .nexora-attendance .attendance-current .rider-kicker, .nexora-attendance .attendance-current .attendance-context, .nexora-attendance .attendance-current .attendance-shift-times p, .nexora-attendance .attendance-current .attendance-shift-times span, .nexora-attendance .attendance-current .attendance-recorded-times dt, .nexora-attendance .attendance-current .attendance-policy-note { color: #c0d8e4; }
+ .nexora-attendance .attendance-current .attendance-status-icon { background: rgb(251 133 0 / 14%); color: #FB8500; }
+ .nexora-attendance .attendance-current .badge { background: rgb(251 133 0 / 12%); border-color: rgb(251 133 0 / 40%); color: #ffc078; }
+ .nexora-attendance .attendance-current .field { background: #fff; color: #023047; border-color: #c0d8e4; }
+ .nexora-attendance .attendance-current .field:focus { border-color: #FB8500; outline-color: #FB8500; --tw-ring-color: #FB8500; }
+ .nexora-attendance .attendance-current .field::placeholder { color: #536f80; }
+ .nexora-attendance .attendance-current .attendance-inactive-action { background: rgb(255 255 255 / 9%); border-color: rgb(255 255 255 / 18%); color: #b7cedb; }
+ .nexora-attendance .attendance-current .attendance-saved-note { background: rgb(255 255 255 / 7%); border-color: rgb(255 255 255 / 18%); color: #fff; }
+ .nexora-attendance .attendance-current .attendance-recorded-times { border-color: rgb(255 255 255 / 18%); }
+ .nexora-attendance .attendance-remark [id$='-error'] { color: #fecaca; }
 }

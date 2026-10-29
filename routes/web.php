@@ -4,6 +4,7 @@ use App\Http\Controllers\AttendanceExportController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\SessionController;
 use App\Http\Controllers\LetterDownloadController;
+use App\Http\Controllers\ProfilePhotoController;
 use App\Http\Controllers\ReportDownloadController;
 use App\Http\Controllers\SesNotificationController;
 use App\Http\Controllers\TaskProofController;
@@ -50,6 +51,7 @@ Route::middleware('guest')->group(function (): void {
 });
 
 Route::middleware(['auth', 'auth.session'])->group(function (): void {
+    Route::get('/account/profile-photo', ProfilePhotoController::class)->middleware('throttle:120,1')->name('account.profile-photo');
     Route::get('/home', function (Request $request) {
         if ($request->user()->can('admin.access')) {
             return redirect()->route('admin.home');

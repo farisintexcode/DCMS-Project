@@ -4,10 +4,12 @@ namespace App\Models;
 
 use App\Enums\AccountStatus;
 use App\Models\Concerns\HasPublicId;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
@@ -36,6 +38,13 @@ class User extends Authenticatable
         return $this->belongsTo(Staff::class);
     }
 
+    public function profilePhoto(): HasOne
+    {
+        return $this->hasOne(Document::class, 'owner_id')->ofMany(['id' => 'max'], function (Builder $query): void {
+            $query->where('owner_type', 'user')->where('document_type_code', 'avatar')->where('scan_status', 'clean');
+        });
+    }
+
     public function clientScopes(): HasMany
     {
         return $this->hasMany(UserClientScope::class);
@@ -49,6 +58,11 @@ class User extends Authenticatable
     public function canUseRiderInterface(): bool
     {
         return $this->isActive() && $this->can('rider.access') && $this->staff()->where('is_active', true)->where('is_rider', true)->exists();
+    }
+
+    public function canManageOwnProfilePhoto(): bool
+    {
+        return $this->isActive() && ($this->can('admin.access') || $this->canUseRiderInterface());
     }
 
     public function hasClientScope(Client $client): bool
