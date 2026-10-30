@@ -1,3 +1,4 @@
+// UI05: the local preview uses the same oriented, square crop as the server.
 window.nexoraPhotoEditor = wire => ({
     preview: null,
     zoom: wire.entangle('photoZoom'),
@@ -8,6 +9,7 @@ window.nexoraPhotoEditor = wire => ({
     imageLoaded: false,
     uploading: false,
     localError: '',
+
     get previewStyle() {
         if (!this.width || !this.height) return '';
         const side = Math.max(1, Math.floor(Math.min(this.width, this.height) / this.zoom));
@@ -15,6 +17,7 @@ window.nexoraPhotoEditor = wire => ({
         const top = Math.round((this.height - side) * this.positionY / 100);
         return `width:${this.width / side * 100}%;height:${this.height / side * 100}%;left:${-left / side * 100}%;top:${-top / side * 100}%;`;
     },
+
     selectPhoto(event) {
         const file = event.target.files?.[0];
         if (!file) return;
@@ -31,27 +34,35 @@ window.nexoraPhotoEditor = wire => ({
         this.preview = URL.createObjectURL(file);
         this.$refs.photoDialog.showModal();
         this.uploading = true;
-        wire.upload('photo', file, () => this.uploading = false, () => {
-            this.uploading = false;
-            this.localError = 'Your photo could not be uploaded. Please try again.';
-        }, () => {}, () => this.uploading = false);
+        wire.upload('photo', file,
+            () => { this.uploading = false; },
+            () => {
+                this.uploading = false;
+                this.localError = 'Your photo could not be uploaded. Please try again.';
+            },
+            () => {},
+            () => { this.uploading = false; },
+        );
     },
+
     imageReady(event) {
         this.width = event.target.naturalWidth;
         this.height = event.target.naturalHeight;
         if (this.width > 4096 || this.height > 4096) {
-            this.localError = 'Resize your image to at most 4096 × 4096 pixels.';
+            this.localError = 'Choose an image no larger than 4096 × 4096 pixels.';
             this.imageLoaded = false;
             return;
         }
         this.imageLoaded = true;
     },
+
     imageFailed() {
         if (this.preview) {
             this.localError = 'This image could not be opened. Choose another photo.';
             this.imageLoaded = false;
         }
     },
+
     cancelPhoto() {
         wire.cancelUpload('photo');
         this.uploading = false;
@@ -61,12 +72,20 @@ window.nexoraPhotoEditor = wire => ({
         this.releasePreview();
         this.localError = '';
     },
-    restoreFocus() { this.$refs.editPhoto?.focus(); },
+
+    restoreFocus() {
+        this.$refs.editPhoto?.focus();
+    },
+
     releasePreview() {
         if (this.preview) URL.revokeObjectURL(this.preview);
         this.preview = null;
-        this.width = this.height = 0;
+        this.width = 0;
+        this.height = 0;
         this.imageLoaded = false;
     },
-    destroy() { this.releasePreview(); },
+
+    destroy() {
+        this.releasePreview();
+    },
 });

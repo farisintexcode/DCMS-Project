@@ -1,6 +1,6 @@
 <section class="rider-page">
 <x-feedback />
-<div class="rider-greeting"><div><p class="rider-kicker">{{ now()->timezone(config('dcms.business_timezone'))->format('l, d F Y') }}</p><h1>Welcome, {{ auth()->user()->name }}</h1><p>Your field workspace, ready when you are.</p></div><span class="rider-greeting-icon" aria-hidden="true"><x-icon name="activity" /></span></div>
+<div class="rider-greeting"><div><p class="rider-meta">{{ now()->timezone(config('dcms.business_timezone'))->format('l, d F Y') }}</p><h1>Welcome, {{ auth()->user()->name }}</h1><p>Your field workspace, ready when you are.</p></div><span class="rider-greeting-icon" aria-hidden="true"><x-icon name="activity" /></span></div>
 @can('tasks.view')
 <div class="rider-dashboard-top">
 <section class="rider-focus-card"><h2>{{ $next?'Your next field task':'Your workspace is ready' }}</h2><p>{{ $next?$next->customer->display_name_ciphertext:'No pending work is currently assigned in your active client scope.' }}</p>@if($next)<span class="rider-focus-batch">{{ $next->batch->name }}</span>@endif<a href="{{ $next?route('rider.tasks.show',$next):route('rider.tasks.index') }}" class="btn btn-primary w-full justify-between">{{ $next?'View next task':'View my tasks' }}<x-icon name="arrow-right" class="size-4" /></a></section>

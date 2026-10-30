@@ -52,6 +52,7 @@ Route::middleware('guest')->group(function (): void {
 });
 
 Route::middleware(['auth', 'auth.session'])->group(function (): void {
+    Route::get('/account/profile-photo', ProfilePhotoController::class)->middleware('throttle:120,1')->name('account.profile-photo');
     Route::get('/home', function (Request $request) {
         if ($request->user()->can('admin.access')) {
             return redirect()->route('admin.home');
@@ -141,7 +142,6 @@ Route::middleware(['auth', 'auth.session'])->group(function (): void {
         Route::livewire('/{task}', App\Livewire\Rider\Tasks\Show::class)->whereUuid('task')->name('show');
     });
     Route::get('/proof/{document}', TaskProofController::class)->whereUuid('document')->middleware('throttle:60,1')->name('proof.show');
-    Route::get('/account/profile-photo', ProfilePhotoController::class)->name('account.profile-photo');
     Route::livewire('/account', Settings::class)->name('account.settings');
     Route::post('/logout', [SessionController::class, 'destroy'])->name('logout');
 });
