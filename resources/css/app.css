@@ -276,10 +276,11 @@
     .rider-header-brand .nexora-logo-icon, .rider-header-brand .nexora-logo-icon img { width: 2.5rem; height: 2.5rem; }
     .rider-brand-label { @apply text-base leading-5 font-bold tracking-tight; }
     .rider-brand-label > span { @apply block text-[9px] leading-4 font-medium tracking-normal text-ink-500; }
-    .rider-avatar { @apply grid size-11 shrink-0 place-items-center rounded-2xl border-2 border-brand-accent bg-brand-primary text-sm font-semibold text-white; }
+    .rider-avatar { @apply grid size-11 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-brand-accent bg-brand-primary text-sm font-semibold text-white; }
     .rider-main { @apply mx-auto grid min-w-0 max-w-5xl gap-6 px-4 pt-6 sm:px-6 sm:pt-8; padding-bottom: calc(7rem + env(safe-area-inset-bottom)); }
     .rider-page { @apply grid min-w-0 gap-5 sm:gap-6; }
     .rider-workspace .page-heading { @apply text-2xl leading-tight sm:text-3xl; }
+    .rider-workspace .rider-main h1 { @apply text-2xl leading-tight font-semibold tracking-tight; }
     .rider-workspace .surface { box-shadow: 0 4px 20px rgb(2 48 71 / 3%); }
     .rider-workspace .empty-state { @apply py-10; }
     .rider-page-footer { @apply pt-4 text-center text-[10px] leading-6 text-ink-500; }
@@ -304,11 +305,10 @@
     .rider-greeting p:last-child { @apply mt-2 text-xs leading-5 text-ink-500; }
     .rider-greeting-icon { @apply hidden size-12 shrink-0 place-items-center rounded-2xl border border-ink-200 text-ink-400 sm:grid; }
     .rider-kicker { @apply text-[10px] leading-5 font-semibold tracking-[.12em] text-ink-500 uppercase; }
+    .rider-workspace .rider-kicker { @apply text-xs font-normal tracking-normal normal-case; }
     .rider-dashboard-top { @apply grid min-w-0 gap-4 md:grid-cols-2; }
     .rider-focus-card { @apply relative grid min-w-0 content-start gap-4 overflow-hidden rounded-3xl p-5 sm:p-6; background: var(--color-brand-primary); color: #fff; }
     .rider-focus-card::after { content: ''; position: absolute; width: 10rem; height: 10rem; border: 1px solid rgb(255 255 255 / 7%); border-radius: 50%; top: -5rem; right: -4rem; pointer-events: none; }
-    .rider-focus-label { @apply inline-flex items-center gap-2 text-[10px] font-semibold tracking-wider uppercase; color: #c8dce6; }
-    .rider-focus-label > span { @apply size-1.5 rounded-full bg-brand-accent; }
     .rider-focus-card h2 { @apply text-xl leading-7 font-semibold tracking-tight sm:text-2xl; }
     .rider-focus-card > p { @apply text-sm leading-6; color: #e1edf4; }
     .rider-focus-batch { @apply -mt-2 text-[11px] leading-5; color: #b4cbd8; }
@@ -532,3 +532,10 @@
     .rider-header .nexora-brand .nexora-on-light { display: none; }
     .rider-header .nexora-brand .nexora-on-dark { display: block; }
 }
+
+.profile-photo-edit { background: #FB8500; color: #023047; }
+.profile-photo-dialog { margin: auto; width: min(28rem, calc(100% - 2rem)); max-height: 90dvh; border: 1px solid var(--color-ink-100); border-radius: 1.25rem; background: var(--surface, #fff); color: var(--foreground, #023047); padding: 0; }
+.profile-photo-dialog::backdrop { background: rgb(2 48 71 / 55%); }
+.profile-photo-preview { position: relative; overflow: hidden; border-radius: 50%; background: white; border: 2px solid #FB8500; }
+.profile-photo-preview img { position: absolute; max-width: none; object-fit: fill; }
+.profile-photo-dialog input[type=range] { width: 100%; accent-color: #FB8500; }

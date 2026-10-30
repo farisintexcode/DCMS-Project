@@ -21,7 +21,7 @@ if ($rider) {
  @mouseenter="hovering = true" @mouseleave="hovering = false; defer()" @focusin="focused = true" @focusout="if (!$el.contains($event.relatedTarget)) { focused = false; defer() }"
  @pointerdown="defer()" @keydown.arrow-right.prevent="go(active + 1)" @keydown.arrow-left.prevent="go(active - 1)"
  @touchstart.passive="touchX = $event.touches[0].clientX; touchY = $event.touches[0].clientY; defer()" @touchend.passive="swipe($event)">
- <p class="eyebrow">{{ $rider ? 'The Nexora rider workspace' : 'The Nexora collection workspace' }}</p>
+ @unless($rider)<p class="eyebrow">The Nexora collection workspace</p>@endunless
  <div class="welcome-slide-stage" aria-live="off">
  @foreach($slides as $slide)
  <article class="welcome-slide" x-show="active === {{ $loop->index }}" @if(!$loop->first) x-cloak @endif x-transition:enter="welcome-fade-enter" x-transition:enter-start="welcome-fade-start" x-transition:enter-end="welcome-fade-end" x-transition:leave="welcome-fade-leave" x-transition:leave-start="welcome-fade-end" x-transition:leave-end="welcome-fade-start" :inert="active !== {{ $loop->index }}" :aria-hidden="active !== {{ $loop->index }}" role="group" aria-roledescription="slide" aria-label="{{ $loop->iteration }} of 4">

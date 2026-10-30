@@ -45,7 +45,7 @@
         @can('viewAny',\App\Models\CommunicationTemplate::class)<x-sidebar-item label="Communications" icon="mail" :href="route('admin.communications.index')" :active="request()->routeIs('admin.communications.*')" />@endcan
         @can('roles.manage')<x-sidebar-item label="Administration" icon="settings" planned />@endcan
     @else
-        <div class="rider-menu-profile sidebar-label"><span class="rider-avatar">{{ mb_strtoupper(mb_substr(auth()->user()->name,0,1)) }}</span><div class="min-w-0"><p class="font-semibold">{{ auth()->user()->name }}</p><p class="mt-1 break-all text-xs">{{ auth()->user()->email }}</p></div></div>
+        <div class="rider-menu-profile sidebar-label"><span class="rider-avatar"><x-profile-photo /></span><div class="min-w-0"><p class="font-semibold">{{ auth()->user()->name }}</p><p class="mt-1 break-all text-xs">{{ auth()->user()->email }}</p></div></div>
         <p class="sidebar-section sidebar-label" x-show="!query.trim()">Your workspace</p>
         <x-sidebar-item label="Home" icon="home" :href="route('rider.home')" :active="request()->routeIs('rider.home')" />
         @can('tasks.view')<x-sidebar-item label="Assignment" icon="layers" :href="route('rider.assignments.index')" :active="request()->routeIs('rider.assignments.*')" />@endcan

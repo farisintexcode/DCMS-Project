@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Account;
 
+use App\Actions\Auth\ProfilePhoto;
 use App\Models\User;
 use App\Services\AuditWriter;
 use Illuminate\Support\Facades\Auth;
@@ -10,10 +11,47 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
 use Livewire\Component;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use Livewire\WithFileUploads;
 
-/** Module.md M01 / Prototype.md UI05; avatar arrives with quarantined Document storage. */
+/** Module.md M01 / Prototype.md UI05; own user identity, password and private Document avatar. */
 class Settings extends Component
 {
+    use WithFileUploads;
+
+    public ?TemporaryUploadedFile $photo = null;
+
+    public float $photoZoom = 1;
+
+    public float $photoX = 50;
+
+    public float $photoY = 50;
+
+    public function savePhoto(ProfilePhoto $photos): void
+    {
+        abort_unless(Auth::user()?->canManageOwnProfilePhoto(), 403);
+        $this->validate(ProfilePhoto::rules());
+        $photos->save(Auth::user(), $this->photo, $this->photoZoom, $this->photoX, $this->photoY);
+        $this->cancelPhoto();
+        session()->flash('status', 'Your profile photo has been updated.');
+        $this->redirectRoute('account.settings');
+    }
+
+    public function cancelPhoto(): void
+    {
+        $this->reset('photo', 'photoZoom', 'photoX', 'photoY');
+        $this->resetValidation(['photo', 'photoZoom', 'photoX', 'photoY']);
+    }
+
+    public function removePhoto(ProfilePhoto $photos): void
+    {
+        abort_unless(Auth::user()?->canManageOwnProfilePhoto(), 403);
+        $photos->remove(Auth::user());
+        $this->cancelPhoto();
+        session()->flash('status', 'Your profile photo has been removed.');
+        $this->redirectRoute('account.settings');
+    }
+
     public string $current_password = '';
 
     public string $password = '';

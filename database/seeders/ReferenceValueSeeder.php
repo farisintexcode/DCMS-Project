@@ -13,7 +13,7 @@ class ReferenceValueSeeder extends Seeder
         $categories = [
             'activity_type' => ['visit' => 'Site visit'],
             'follow_up_type' => ['reminder' => 'Reminder'],
-            'document_type' => ['proof_image' => 'Proof image'],
+            'document_type' => ['proof_image' => 'Proof image', 'avatar' => 'Profile picture'],
             'party_role' => ['owner' => 'Owner', 'tenant' => 'Tenant', 'occupier' => 'Occupier', 'billing_customer' => 'Billing customer'],
             'position' => ['01' => 'Staff', '02' => 'Administrative', '03' => 'Supervisor', '04' => 'Manager', '05' => 'Director', '99' => 'System Admin', '06' => 'Call Center'],
             'gender' => ['male' => 'Male', 'female' => 'Female'],
