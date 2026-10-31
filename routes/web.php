@@ -31,6 +31,7 @@ use App\Livewire\Admin\Tasks\Allocation;
 use App\Livewire\Rider\Attendance;
 use App\Livewire\Rider\Home as RiderHome;
 use App\Livewire\Rider\Notifications;
+use App\Livewire\Rider\Profile;
 use App\Livewire\Rider\Tasks\Manage;
 use App\Livewire\Rider\Tasks\SubmissionHistory;
 use Illuminate\Http\Request;
@@ -128,6 +129,7 @@ Route::middleware(['auth', 'auth.session'])->group(function (): void {
         Route::livewire('/{customer}', Show::class)->name('show');
     });
     Route::livewire('/rider', RiderHome::class)->middleware('can:use-rider-interface')->name('rider.home');
+    Route::livewire('/rider/profile', Profile::class)->middleware('can:use-rider-interface')->name('rider.profile');
     Route::middleware(['can:use-rider-interface', 'can:tasks.view'])->prefix('rider/assignments')->name('rider.assignments.')->group(function (): void {
         Route::livewire('/', App\Livewire\Rider\Assignments\Index::class)->name('index');
         Route::livewire('/{batch}', App\Livewire\Rider\Assignments\Show::class)->whereUuid('batch')->name('show');

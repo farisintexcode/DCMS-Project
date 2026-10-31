@@ -81,5 +81,5 @@ test('Rider notifications are owned scoped and remain unread when merely display
 test('Rider shell has exactly the four requested primary destinations and profile in the header', function (): void {
     [$rider] = riderPresentationFixture();
     $this->actingAs($rider)->get(route('rider.home'))->assertOk()->assertSee('aria-label="Profile"', false)->assertSee('Assignment overview')->assertSee('My Task')->assertSee(route('rider.assignments.index'));
-    $this->get(route('account.settings'))->assertOk()->assertSee('Account settings');
+    $this->get(route('account.settings'))->assertOk()->assertSee('Account Settings');
 });

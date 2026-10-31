@@ -10,11 +10,15 @@
         document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#082838' : '#ffffff');
         window.dispatchEvent(new CustomEvent('dcms-theme', { detail: dark }));
     };
-    window.dcmsToggleTheme = () => {
-        preference = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
+    window.dcmsThemePreference = () => ['light', 'dark'].includes(preference) ? preference : 'system';
+    window.dcmsSetTheme = value => {
+        if (!['light', 'dark', 'system'].includes(value)) return;
+        preference = value;
         write('dcms.theme', preference);
         appearance();
+        window.dispatchEvent(new CustomEvent('dcms-appearance', { detail: preference }));
     };
+    window.dcmsToggleTheme = () => window.dcmsSetTheme(document.documentElement.classList.contains('dark') ? 'light' : 'dark');
     appearance();
     system.addEventListener('change', appearance);
     window.addEventListener('storage', event => { if (event.key === 'dcms.theme' || event.key === null) { preference = read('dcms.theme'); appearance(); } });

@@ -1,6 +1,7 @@
-<div x-data="nexoraPhotoEditor($wire)" class="profile-photo-editor">
+@props(['onDark' => false])
+<div x-data="nexoraPhotoEditor($wire)" @class(['profile-photo-editor', 'profile-photo-on-dark' => $onDark])>
     <div class="relative inline-flex">
-        <span class="profile-avatar grid size-20 place-items-center overflow-hidden rounded-full border-2 border-white bg-brand-soft text-brand-dark text-2xl font-semibold shadow-sm"><x-profile-photo /></span>
+        <span @class(['profile-avatar grid place-items-center overflow-hidden rounded-full border-2 border-white text-2xl font-semibold shadow-sm', 'size-24 bg-white/10 text-white' => $onDark, 'size-20 bg-brand-soft text-brand-dark' => !$onDark])><x-profile-photo /></span>
         @if(auth()->user()->canManageOwnProfilePhoto())
             <button x-ref="editPhoto" type="button" @click="$refs.photoPicker.click()" class="profile-photo-edit" aria-label="Edit profile photo" title="Edit profile photo"><x-icon name="edit" class="size-4" /></button>
         @endif
@@ -8,7 +9,7 @@
     @if(auth()->user()->canManageOwnProfilePhoto())
         <input x-ref="photoPicker" type="file" @change="selectPhoto($event)" accept="image/jpeg,image/png,image/webp" class="sr-only" tabindex="-1" aria-label="Choose profile picture" />
         @if(auth()->user()->profilePhoto)
-            <button type="button" class="mt-3 block min-h-11 text-xs text-ink-500 underline decoration-ink-200 underline-offset-4 transition-colors hover:text-brand-dark" wire:click="removePhoto" wire:confirm="Remove your profile photo and return to your initials?" wire:loading.attr="disabled" wire:target="photo,savePhoto,removePhoto">Remove photo</button>
+            <button type="button" @class(['profile-photo-remove mt-3 block min-h-11 text-xs underline decoration-ink-200 underline-offset-4 transition-colors', 'text-white/80 hover:text-white' => $onDark, 'text-ink-500 hover:text-brand-dark' => !$onDark]) wire:click="removePhoto" wire:confirm="Remove your profile photo and return to your initials?" wire:loading.attr="disabled" wire:target="photo,savePhoto,removePhoto">Remove photo</button>
         @endif
         <p x-cloak x-show="localError" x-text="localError" role="alert" class="mt-3 text-sm text-red-700 dark:text-red-300"></p>
         <dialog x-ref="photoDialog" wire:ignore.self @cancel.prevent="cancelPhoto()" @close="restoreFocus()" class="profile-photo-dialog" aria-labelledby="photo-editor-title" aria-describedby="photo-editor-description">

@@ -158,7 +158,7 @@ test('admin and rider save a private scanned profile picture and see it across t
     expect(getimagesizefromstring($bytes)[0])->toBe(512)->and(getimagesizefromstring($bytes)[1])->toBe(512);
     $this->assertDatabaseHas('audit_logs', ['actor_id' => $rider->id, 'action' => 'profile_photo_updated']);
     $this->actingAs($rider)->get(route('account.profile-photo'))->assertOk()->assertHeader('Content-Type', 'image/jpeg')->assertContent($bytes);
-    $this->get(route('account.settings'))->assertOk()->assertSee('Your profile picture')->assertSee('Save Photo')->assertSee('Edit profile photo')->assertSee('Change password');
+    $this->get(route($portal === 'admin' ? 'account.settings' : 'rider.profile'))->assertOk()->assertSee('Your profile picture')->assertSee('Save Photo')->assertSee('Edit profile photo')->assertSee($portal === 'admin' ? 'Change password' : 'Personal information');
     $this->get(route($portal.'.home'))->assertOk()->assertSee('Your profile picture');
     $this->post(route('logout'))->assertRedirect();
     $this->post(route($portal === 'admin' ? 'login.store' : 'rider.login.store'), ['email' => $rider->email, 'password' => 'password'])->assertRedirect();
