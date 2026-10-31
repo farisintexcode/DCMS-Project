@@ -92,7 +92,7 @@ class Index extends Component
             'pending_verification' => $tasks->where('work_status', 'submitted')->where('review_status', 'pending'),
             'returned' => $tasks->where('review_status', 'returned'),
             'visited','pending_completion' => $tasks->where('work_status', 'in_progress')->whereHas('activities', fn ($q) => $q->where('activity_type_code', 'visit')),
-            'overdue' => $tasks->whereNotIn('work_status', ['completed', 'cancelled'])->where(fn ($q) => $q->where('due_at', '<', now())->orWhere(fn ($q) => $q->whereNull('due_at')->whereHas('batch', fn ($q) => $q->whereRaw('((due_date + 1)::timestamp AT TIME ZONE ?) <= ?', [config('dcms.business_timezone'), now()])))),
+            'overdue' => $access->overdue($tasks),
             default => $tasks->whereRaw('false'),
         };
         if ($this->batch !== '') {

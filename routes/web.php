@@ -18,6 +18,7 @@ use App\Livewire\Admin\Communications\Preferences;
 use App\Livewire\Admin\Communications\Receipts;
 use App\Livewire\Admin\Communications\Recipients;
 use App\Livewire\Admin\Customers\Categories;
+use App\Livewire\Admin\Customers\Clients;
 use App\Livewire\Admin\Customers\Editor;
 use App\Livewire\Admin\Customers\Index;
 use App\Livewire\Admin\Customers\Show;
@@ -123,6 +124,7 @@ Route::middleware(['auth', 'auth.session'])->group(function (): void {
         Route::livewire('/', Index::class)->name('index');
         Route::livewire('/create', Editor::class)->name('create');
         Route::livewire('/categories', Categories::class)->name('categories');
+        Route::livewire('/clients', Clients::class)->middleware('can:scopes.manage')->name('clients');
         Route::livewire('/{customer}/edit', Editor::class)->name('edit');
         Route::livewire('/{customer}', Show::class)->name('show');
     });

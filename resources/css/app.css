@@ -118,6 +118,8 @@
     .tab-button[aria-current='page'] { @apply border-ink-200 bg-brand-soft text-brand-dark; box-shadow: inset 0 -3px var(--color-brand-accent); }
     .chart-bar { background: linear-gradient(180deg, var(--color-brand-hover), var(--color-brand-primary)); border-radius: 6px 6px 2px 2px; }
     .chart-bar:hover { background: var(--color-brand-accent); }
+.chart-bar-secondary { background: var(--color-brand-accent); border-radius: 6px 6px 2px 2px; }
+.chart-bar-secondary:hover { background: var(--color-brand-accent-hover); }
 
     .auth-art { background: linear-gradient(145deg, #023047, #06445e); color: #fff; }
     .auth-art .eyebrow { color: #c0d8e4; }
@@ -275,6 +277,7 @@
 
 @layer utilities {
     .dark .chart-bar { background: linear-gradient(180deg, var(--color-brand-accent), var(--color-brand-accent-hover)); }
+.dark .chart-bar-secondary { background: var(--color-ink-500); }
     .dark .action-tile > svg:first-child, .dark .step-number { color: var(--foreground); }
 }
 

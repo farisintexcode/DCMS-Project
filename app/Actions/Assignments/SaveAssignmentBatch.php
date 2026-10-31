@@ -20,10 +20,11 @@ class SaveAssignmentBatch
 {
     public function __construct(private AuditWriter $audit, private BatchWork $work) {}
 
-    public function handle(User $actor, array $input, ?AssignmentBatch $existing = null, ?int $version = null): AssignmentBatch
+    /** The initial status applies to new assignments only; later status changes go through ChangeBatchStatus. */
+    public function handle(User $actor, array $input, ?AssignmentBatch $existing = null, ?int $version = null, string $initialStatus = 'active'): AssignmentBatch
     {
         try {
-            return DB::transaction(function () use ($actor, $input, $existing, $version): AssignmentBatch {
+            return DB::transaction(function () use ($actor, $input, $existing, $version, $initialStatus): AssignmentBatch {
                 $clientId = $existing?->client_id ?? (is_scalar($input['client_id'] ?? null) ? filter_var($input['client_id'], FILTER_VALIDATE_INT) : 0);
                 $client = Client::query()->lockForUpdate()->findOrFail($clientId ?: 0);
                 abort_unless($actor->hasClientScope($client), 404);
@@ -57,7 +58,10 @@ class SaveAssignmentBatch
                 foreach (['type_code' => 'assignment_type', 'state_code' => 'state'] as $field => $category) {
                     $rules[$field] = [$field === 'type_code' ? 'required' : 'nullable', 'string', 'max:64', Rule::exists('reference_values', 'code')->where('category', $category)->where(fn ($q) => $q->when(! $batch->exists || ($input[$field] ?? null) !== $batch->{$field}, fn ($q) => $q->where('is_active', true)))];
                 }
-                $validator = Validator::make($input, $rules);
+                if (! $existing && ! in_array($initialStatus, ['active', 'archived'], true)) {
+                    throw ValidationException::withMessages(['status' => 'Choose active or archived.']);
+                }
+                $validator = Validator::make($input, $rules, ['due_date.after_or_equal' => 'The due date cannot be earlier than the assignment date.']);
                 if ($validator->fails()) {
                     throw ValidationException::withMessages(collect($validator->errors()->toArray())->mapWithKeys(fn ($messages, $key) => ['data.'.$key => $messages])->all());
                 }
@@ -74,13 +78,14 @@ class SaveAssignmentBatch
                 $batch->client_id = $client->id;
                 if (! $existing) {
                     $batch->created_by = $actor->id;
-                    $batch->status = BatchStatus::Active;
+                    $batch->status = BatchStatus::from($initialStatus);
+                    $batch->archived_at = $batch->status === BatchStatus::Archived ? now() : null;
                     $batch->lock_version = 0;
                 } else {
                     $batch->lock_version++;
                 }
                 $batch->save();
-                $this->audit->record($actor, $existing ? 'assignment_updated' : 'assignment_created', $batch->public_id, ['status' => 'active', 'changed_fields' => array_keys($data)], module: 'M03', entityType: 'assignment_batch');
+                $this->audit->record($actor, $existing ? 'assignment_updated' : 'assignment_created', $batch->public_id, ['status' => $batch->status->value, 'changed_fields' => array_keys($data)], module: 'M03', entityType: 'assignment_batch');
 
                 return $batch->refresh();
             }, 3);

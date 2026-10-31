@@ -4,8 +4,6 @@ namespace App\Livewire\Admin\Calls;
 
 use App\Actions\Calls\ResolveFollowUp;
 use App\Models\CollectionActivity;
-use App\Models\FollowUp;
-use App\Models\Task;
 use App\Services\Calls\CallAccess;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Gate;
@@ -44,14 +42,7 @@ class FollowUps extends Component
 
     private function scoped(CallAccess $access): Builder
     {
-        $query = FollowUp::query()->whereIn('customer_id', $access->customers(auth()->user())->select('debtors.id'));
-
-        return $query->where(function ($q): void {
-            $q->whereHas('activity', fn ($q) => $q->where('activity_type_code', 'call'));
-            if (Gate::allows('viewAny', Task::class)) {
-                $q->orWhereHas('activity', fn ($q) => $q->where('activity_type_code', 'visit'));
-            }
-        });
+        return $access->followUps(auth()->user());
     }
 
     public function resolve(string $id, int $version, ResolveFollowUp $resolve, CallAccess $access): void

@@ -2,15 +2,20 @@
     <x-feedback />
     <x-page-header title="Assignment batches" eyebrow="Recovery work packages" description="Organize client assignments, schedules and routing metadata before importing tasks."><x-slot:actions>@can('create', \App\Models\AssignmentBatch::class)<a class="btn btn-primary" href="{{ route('admin.assignments.create') }}"><x-icon name="plus" class="size-4" />New assignment</a>@endcan</x-slot:actions></x-page-header>
     <nav aria-label="Assignment register" class="flex flex-wrap gap-2"><a class="tab-button" href="{{ route('admin.assignments.index') }}" @if($status === 'active') aria-current="page" @endif>Active assignments</a><a class="tab-button" href="{{ route('admin.assignments.index', ['status'=>'archived']) }}" @if($status === 'archived') aria-current="page" @endif>Archived assignments</a></nav>
-    <div class="surface grid gap-4 p-5 sm:grid-cols-2 xl:grid-cols-4">
-        <x-input name="query" label="Search assignments" wire:model.live.debounce.400ms="query" placeholder="Name or external reference" maxlength="200" autocomplete="off" />
-        <x-select name="client" label="Client" wire:model.live="client"><option value="">All permitted clients</option>@foreach($clients as $item)<option value="{{ $item->id }}">{{ $item->name }}</option>@endforeach</x-select>
-        <x-select name="type" label="Assignment type" wire:model.live="type"><option value="">All types</option>@foreach($types as $item)<option value="{{ $item->code }}">{{ $item->label }}</option>@endforeach</x-select>
-        <x-select name="state" label="State" wire:model.live="state"><option value="">All states</option>@foreach($states as $item)<option value="{{ $item->code }}">{{ $item->label }}</option>@endforeach</x-select>
-        <x-input name="from" label="Assignment date from" type="date" wire:model.live="from" /><x-input name="until" label="Assignment date until" type="date" wire:model.live="until" />
-        <x-select name="sort" label="Sort assignments" wire:model.live="sort"><option value="newest">Newest first</option><option value="name">Assignment name</option><option value="due">Earliest due date</option></x-select>
-        <x-select name="perPage" label="Assignments per page" wire:model.live="perPage"><option value="25">25</option><option value="50">50</option><option value="100">100</option></x-select>
-        <div class="flex flex-wrap items-center justify-between gap-3 sm:col-span-2 xl:col-span-4"><p class="field-help">Client-scoped metadata only. Task intake and reporting connect in their respective modules.</p><button type="button" class="min-h-11 text-xs underline" wire:click="resetFilters">Clear filters</button></div>
+    @php($extraFilters = collect([$type, $state, $from, $until])->filter(fn ($value) => $value !== '')->count() + ($perPage !== '25' ? 1 : 0))
+    <div class="surface grid gap-4 p-5" x-data="{ more: {{ $extraFilters > 0 ? 'true' : 'false' }} }">
+        <div class="grid items-end gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
+            <x-input name="query" label="Search assignments" wire:model.live.debounce.400ms="query" placeholder="Name or external reference" maxlength="200" autocomplete="off" />
+            <x-select name="client" label="Client" wire:model.live="client"><option value="">All clients</option>@foreach($clients as $item)<option value="{{ $item->id }}">{{ $item->name }}</option>@endforeach</x-select>
+            <x-select name="sort" label="Sort by" wire:model.live="sort"><option value="newest">Newest first</option><option value="name">Assignment name</option><option value="due">Earliest due date</option></x-select>
+            <div class="flex flex-wrap items-center gap-3"><button type="button" class="btn btn-secondary" @click="more = !more" :aria-expanded="more" aria-controls="assignment-more-filters"><x-icon name="filter" class="size-4" />More filters @if($extraFilters)<span class="rounded-full bg-brand-soft px-2 text-[11px] font-semibold">{{ $extraFilters }}</span>@endif</button>@if($extraFilters || $query !== '' || $client !== '' || $sort !== 'newest')<button type="button" class="min-h-11 text-xs underline" wire:click="resetFilters">Clear filters</button>@endif</div>
+        </div>
+        <div id="assignment-more-filters" x-show="more" x-cloak class="grid gap-4 border-t border-ink-100 pt-4 sm:grid-cols-2 xl:grid-cols-5">
+            <x-select name="type" label="Assignment type" wire:model.live="type"><option value="">All types</option>@foreach($types as $item)<option value="{{ $item->code }}">{{ $item->label }}</option>@endforeach</x-select>
+            <x-select name="state" label="State" wire:model.live="state"><option value="">All states</option>@foreach($states as $item)<option value="{{ $item->code }}">{{ $item->label }}</option>@endforeach</x-select>
+            <x-input name="from" label="Assignment date from" type="date" wire:model.live="from" /><x-input name="until" label="Assignment date until" type="date" wire:model.live="until" />
+            <x-select name="perPage" label="Assignments per page" wire:model.live="perPage"><option value="25">25</option><option value="50">50</option><option value="100">100</option></x-select>
+        </div>
     </div>
     @if($filterError)<p role="alert" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs">{{ $filterError }}</p>@endif
     <x-loading wire:loading.delay label="Loading assignments…" />

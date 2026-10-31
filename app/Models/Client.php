@@ -11,7 +11,7 @@ class Client extends Model
 {
     use HasFactory, HasPublicId;
 
-    protected $fillable = ['code', 'name', 'default_currency'];
+    protected $fillable = ['code', 'name', 'category', 'default_currency'];
 
     protected function casts(): array
     {

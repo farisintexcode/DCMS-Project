@@ -17,7 +17,7 @@
     </div>
     <x-loading wire:loading.delay label="Loading customers…" />
     @if($clients->isEmpty())
-        <x-empty-state icon="shield" title="No client portfolio access" message="No client portfolio access is currently granted. Ask an authorized administrator to grant access before creating or viewing customers." />
+        <x-empty-state icon="shield" title="Create a client first" message="Customers are recorded under a client. Create a client, or ask an authorized administrator to grant you access to one.">@can('scopes.manage')<a href="{{ route('admin.customers.clients') }}" class="btn btn-primary"><x-icon name="plus" class="size-4" />Create client</a>@endcan</x-empty-state>
     @else
         <div class="flex flex-wrap items-center justify-between gap-3"><p class="text-xs text-ink-500"><strong class="font-semibold text-brand-dark">{{ number_format($customers->total()) }}</strong> matching customers · {{ $customers->perPage() }} per page</p><span class="flex items-center gap-1.5 text-[10px] text-ink-500"><x-icon name="shield" class="size-3.5" />Your permitted portfolio</span></div>
         @if($customers->isNotEmpty())
