@@ -295,6 +295,7 @@
     .rider-main { @apply mx-auto grid min-w-0 max-w-5xl gap-6 px-4 pt-6 sm:px-6 sm:pt-8; padding-bottom: calc(7rem + env(safe-area-inset-bottom)); }
     .rider-page { @apply grid min-w-0 gap-5 sm:gap-6; }
     .rider-workspace .page-heading { @apply text-2xl leading-tight sm:text-3xl; }
+    .rider-workspace .rider-main h1 { @apply text-2xl leading-tight font-semibold tracking-tight; }
     .rider-workspace .surface { box-shadow: 0 4px 20px rgb(2 48 71 / 3%); }
     .rider-workspace .empty-state { @apply py-10; }
     .rider-page-footer { @apply pt-4 text-center text-[10px] leading-6 text-ink-500; }
@@ -313,7 +314,16 @@
     .rider-menu-appearance { @apply mt-4 flex items-center justify-between border-t border-white/10 px-3 pt-5 text-xs; color: #d2e2eb; }
     .rider-menu-appearance .theme-toggle { background: rgb(255 255 255 / 7%); border-color: rgb(255 255 255 / 14%); color: #fff; }
     .rider-side-footer { @apply grid gap-4 py-4; padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
-    .rider-logout { @apply flex min-h-12 w-full items-center gap-3 rounded-xl border border-white/15 px-3 text-xs font-semibold text-white transition-colors hover:bg-white/10; }
+    .rider-account-menu { @apply absolute right-0 top-full z-50 mt-3 w-72 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-ink-200 shadow-xl; background: var(--surface); color: var(--foreground); }
+    .rider-account-item { @apply flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm transition-colors; }
+    .rider-account-item:hover, .rider-account-item:focus-visible { background: var(--surface-raised); box-shadow: inset 3px 0 #FB8500; }
+    .rider-account-logout { color: #a64e00; }
+    .dark .rider-account-logout { color: #ffac4d; }
+    .rider-account-item[aria-current="page"] { background: var(--surface-raised); box-shadow: inset 3px 0 #FB8500; }
+    .rider-profile-header { @apply flex flex-col items-start gap-5 rounded-3xl border-t-4 border-brand-accent bg-brand-primary p-5 text-white sm:flex-row sm:items-center sm:gap-6 sm:p-6; }
+    .rider-workspace .rider-account-card { padding: var(--rider-card-padding, 1.25rem); }
+    .rider-appearance-option { @apply flex min-w-0 cursor-pointer items-center gap-3 rounded-2xl border border-ink-200 p-4 transition-colors hover:border-brand-accent; }
+    .rider-appearance-option.is-selected { @apply border-brand-accent bg-brand-soft; }
     .rider-greeting { @apply flex items-center justify-between gap-4; }
     .rider-greeting h1 { @apply mt-2 text-2xl leading-tight font-semibold tracking-tight; }
     .rider-greeting p:last-child { @apply mt-2 text-xs leading-5 text-ink-500; }
@@ -324,8 +334,6 @@
     .rider-dashboard-top { @apply grid min-w-0 gap-4 md:grid-cols-2; }
     .rider-focus-card { @apply relative grid min-w-0 content-start gap-4 overflow-hidden rounded-3xl p-5 sm:p-6; background: var(--color-brand-primary); color: #fff; }
     .rider-focus-card::after { content: ''; position: absolute; width: 10rem; height: 10rem; border: 1px solid rgb(255 255 255 / 7%); border-radius: 50%; top: -5rem; right: -4rem; pointer-events: none; }
-
-
     .rider-focus-card h2 { @apply text-xl leading-7 font-semibold tracking-tight sm:text-2xl; }
     .rider-focus-card > p { @apply text-sm leading-6; color: #e1edf4; }
     .rider-focus-batch { @apply -mt-2 text-[11px] leading-5; color: #b4cbd8; }
@@ -505,7 +513,7 @@
  .auth-reference .welcome-feature-card { min-height: 5rem; padding: .85rem; gap: .75rem; font-size: .8rem; }
  .auth-reference .welcome-mini-grid > div { padding: .85rem; font-size: .7rem; }
  .auth-reference .welcome-controls { margin-top: .65rem; }
- .auth-reference .auth-panel.has-auth-card { padding: 2rem clamp(1.25rem, 3vw, 3rem); background: #023047; border-left: 1px solid #ffffff1f; }
+ .auth-reference .auth-panel.has-auth-card { padding: 2rem clamp(1.25rem, 3vw, 3rem); background: #023047; border-left: 0; }
  .auth-reference .auth-card { max-width: 28rem; padding: clamp(1.5rem, 2.6vw, 2rem); border-radius: 1.25rem; gap: 1.2rem; box-shadow: 0 12px 36px rgb(0 0 0 / 12%); }
  .auth-reference .auth-card h1 { font-size: 1.75rem; margin-top: .5rem; }
  .auth-reference .auth-card .icon-tile { margin-bottom: 1rem; width: 2.75rem; height: 2.75rem; border-radius: .85rem; }

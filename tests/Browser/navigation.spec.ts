@@ -97,15 +97,32 @@ test('Admin navigation supports search groups collapse tooltips and mobile keybo
     expect(errors).toEqual([]);
 });
 
-test('Rider uses four bottom destinations profile in the header and logout in the side menu', async ({ page }) => {
+test('Rider keeps four bottom destinations and groups account actions under the avatar', async ({ page }) => {
     await signIn(page, true);
     const navigation = page.getByRole('navigation', { name: 'Rider navigation', exact: true });
     await expect(navigation.getByRole('link')).toHaveText(['Home','Assignment','My Task','Attendance']);
-    await expect(page.locator('header').getByRole('link',{name:'Profile',exact:true})).toBeVisible();
+    const profile = page.locator('header').getByRole('button', { name: 'Profile', exact: true });
+    await profile.focus();
+    await page.keyboard.press('ArrowDown');
+    const accountMenu = page.getByRole('menu', { name: 'Profile', exact: true });
+    await expect(accountMenu.getByRole('menuitem')).toHaveText(['My Profile', 'Account Settings', 'Logout']);
+    await expect(accountMenu.getByRole('menuitem', { name: 'My Profile', exact: true })).toBeFocused();
+    await page.keyboard.press('End');
+    await expect(accountMenu.getByRole('menuitem', { name: 'Logout', exact: true })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(accountMenu).not.toBeVisible();
+    await expect(profile).toBeFocused();
+    await profile.click();
+    await page.locator('main').click({ position: { x: 4, y: 4 } });
+    await expect(accountMenu).not.toBeVisible();
+    await profile.click();
+    await accountMenu.getByRole('menuitem', { name: 'My Profile', exact: true }).click();
+    await expect(page).toHaveURL(/\/rider\/profile$/);
+    await expect(page.locator('#profile-information')).toBeInViewport();
     await expect(page.locator('header').getByRole('button',{name:'Sign out',exact:true})).toHaveCount(0);
     await page.getByRole('button',{name:'Menu',exact:true}).click();
     const sidebar=page.getByRole('dialog',{name:'Rider sidebar',exact:true});
-    await expect(sidebar.getByRole('button',{name:'Sign out',exact:true})).toBeVisible();
+    await expect(sidebar.locator('form[action$="/logout"]')).toHaveCount(0);
     await expect(page.getByRole('button',{name:'Close menu',exact:true})).toBeFocused();
     await page.getByRole('button',{name:'Switch to dark mode',exact:true}).click();
     await expect(page.locator('html')).toHaveClass(/dark/);
@@ -114,5 +131,16 @@ test('Rider uses four bottom destinations profile in the header and logout in th
     await expect(page.getByRole('button',{name:'Menu',exact:true})).toBeFocused();
     await page.reload();
     await expect(page.locator('html')).toHaveClass(/dark/);
+    await profile.click();
+    await expect(accountMenu).toBeVisible();
+    await expect(page.locator('#rider-account-menu')).toHaveCSS('opacity', '1');
     await page.screenshot({path:test.info().outputPath('dark-rider.png'),fullPage:true});
+    await accountMenu.getByRole('menuitem', { name: 'Account Settings', exact: true }).click();
+    await expect(page).toHaveURL(/\/account$/);
+    await expect(accountMenu).not.toBeVisible();
+    await profile.click();
+    await accountMenu.getByRole('menuitem', { name: 'Logout', exact: true }).click();
+    await expect(page).toHaveURL(/\/rider\/login$/);
+    await page.goto('/rider');
+    await expect(page).toHaveURL(/\/rider\/login$/);
 });

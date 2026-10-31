@@ -49,8 +49,9 @@ class CompletionChecklist
     {
         $visit = $task->activities()->where('performed_by', $actor->id)->where('activity_type_code', 'visit')->latest('id')->first();
         $policy = $this->policy($task, $visit?->visit_purpose_code ?? 'site_visit');
+        $inspection = $visit?->inspection;
         if ($policy && $visit) {
-            if ($visit->outcome_code === 'payment_claimed') {
+            if ($visit->outcome_code === 'payment_claimed' || $inspection?->dr_code === 'DR01') {
                 $policy['required_categories'][] = 'payment_evidence';
             }
             if (($policy['signboard_when_available'] ?? false) && $visit->signboard_available) {
@@ -59,10 +60,12 @@ class CompletionChecklist
             $policy['business_required'] = $policy['business_required'] || $visit->business_applicable;
             $policy['required_categories'] = array_values(array_unique($policy['required_categories']));
         }
-        $inspection = $visit?->inspection;
         $documents = $this->documents($task, $actor, $visit?->id);
         $clean = $documents->where('scan_status', 'clean');
         $issues = [];
+        if ($inspection?->dr_code === 'DR02' && ! $visit->followUps()->where('status', '!=', 'cancelled')->exists()) {
+            $issues['follow_up'] = 'Record a due follow-up for Promised To Pay.';
+        }
         if (! $policy) {
             $issues['policy'] = 'An approved task-type completion policy is required (G06).';
         }
@@ -112,13 +115,13 @@ class CompletionChecklist
             'availability' => $visit?->availability_code, 'site_status' => $visit?->visit_status_code, 'contact_result' => $visit?->contact_result_code,
             'site_address' => $visit?->site_address_ciphertext, 'person_contacted' => $visit?->person_contacted_ciphertext,
             'remarks' => ['visit' => $visit?->visit_remarks_ciphertext, 'collection' => $visit?->collection_remarks_ciphertext, 'customer' => $visit?->customer_remarks_ciphertext],
-            'business' => $inspection ? ['reference' => $inspection->public_id, 'type' => $inspection->business_type_code, 'nature' => $inspection->business_nature_code, 'status' => $inspection->business_status_code, 'other' => $inspection->business_other_ciphertext, 'name' => $inspection->shop_company_ciphertext] : null,
+            'business' => $inspection ? ['reference' => $inspection->public_id, 'type' => $inspection->business_type_code, 'nature' => $inspection->business_nature_code, 'status' => $inspection->business_status_code, 'other' => $inspection->business_other_ciphertext, 'name' => $inspection->shop_company_ciphertext, 'dr_code' => $inspection->dr_code, 'usage' => $inspection->usage_code, 'property_type' => $inspection->property_type_code, 'usage_other' => $inspection->usage_other] : null,
             'follow_ups' => $visit?->followUps()->orderBy('id')->get()->map(fn ($f) => ['reference' => $f->public_id, 'due' => $f->due_at->toIso8601String(), 'remarks' => $f->notes_ciphertext])->all() ?? [],
             'customer' => ['reference' => $task->customer->customer_reference, 'name' => $task->customer->display_name_ciphertext],
             'account' => $task->account->account_number,
             'proof' => $documents->map(fn ($d) => ['id' => $d->id, 'reference' => $d->public_id, 'activity' => $d->activity_id, 'reference_time' => $d->created_at?->toIso8601String(), 'category' => $d->image_category_code, 'status' => $d->scan_status, 'sha256' => $d->sha256, 'bucket' => $d->bucket, 'key' => $d->object_key, 'version' => $d->version_id, 'caption' => $d->caption_ciphertext])->all(),
         ];
-        $snapshot['lookup_labels'] = ReferenceValue::query()->whereIn('category', ['availability', 'visit_status', 'contact_result', 'activity_outcome', 'visit_purpose', 'business_type', 'business_nature', 'business_status', 'image_category'])->orderBy('category')->orderBy('code')->get(['category', 'code', 'label'])->map(fn ($r) => $r->only(['category', 'code', 'label']))->all();
+        $snapshot['lookup_labels'] = ReferenceValue::query()->whereIn('category', ['dr_code', 'property_usage', 'property_type', 'availability', 'visit_status', 'contact_result', 'activity_outcome', 'visit_purpose', 'business_type', 'business_nature', 'business_status', 'image_category'])->orderBy('category')->orderBy('code')->get(['category', 'code', 'label'])->map(fn ($r) => $r->only(['category', 'code', 'label']))->all();
 
         return ['issues' => $issues, 'snapshot' => $snapshot, 'digest' => hash_hmac('sha256', json_encode($snapshot, JSON_THROW_ON_ERROR), config('app.key')), 'visit' => $visit, 'documents' => $documents];
     }

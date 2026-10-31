@@ -64,6 +64,7 @@ class Show extends Component
         $this->submissionKey = (string) Str::uuid7();
         $visit = $task->activities()->where('activity_type_code', 'visit')->where('performed_by', Auth::id())->latest('id')->first();
         $this->data = ['purpose' => $visit?->visit_purpose_code ?? 'site_visit', 'business_applicable' => $visit?->business_applicable ?? false, 'signboard_available' => $visit?->signboard_available === null ? '' : ($visit->signboard_available ? '1' : '0'), 'backdating_reason' => '', 'occurred_at' => '', 'ended_at' => '', 'site_address' => $visit?->site_address_ciphertext ?? $task->account->property?->address_lines_ciphertext ?? '',
+            'dr_code' => $visit?->inspection?->dr_code ?? '', 'usage' => $visit?->inspection?->usage_code ?? '', 'property_type' => $visit?->inspection?->property_type_code ?? '', 'usage_other' => $visit?->inspection?->usage_other ?? '',
             'availability' => $visit?->availability_code ?? '', 'visit_status' => $visit?->visit_status_code ?? '', 'contact_result' => $visit?->contact_result_code ?? '', 'outcome' => $visit?->outcome_code ?? '',
             'person_contacted' => $visit?->person_contacted_ciphertext ?? '', 'visit_remarks' => $visit?->visit_remarks_ciphertext ?? '', 'collection_remarks' => $visit?->collection_remarks_ciphertext ?? '', 'customer_remarks' => $visit?->customer_remarks_ciphertext ?? '',
             'business_type' => $visit?->inspection?->business_type_code ?? '', 'business_nature' => $visit?->inspection?->business_nature_code ?? '', 'business_status' => $visit?->inspection?->business_status_code ?? '',
@@ -179,7 +180,7 @@ class Show extends Component
             $this->section = 'overview';
         }
         $review = $checklist->review($task, Auth::user());
-        $choices = ReferenceValue::query()->whereIn('category', ['visit_purpose', 'availability', 'visit_status', 'contact_result', 'activity_outcome', 'business_type', 'business_nature', 'business_status', 'image_category'])->where('is_active', true)->orderBy('sort_order')->orderBy('code')->get()
+        $choices = ReferenceValue::query()->whereIn('category', ['dr_code', 'property_usage', 'property_type', 'visit_purpose', 'availability', 'visit_status', 'contact_result', 'activity_outcome', 'business_type', 'business_nature', 'business_status', 'image_category'])->where('is_active', true)->orderBy('sort_order')->orderBy('code')->get()
             ->filter(fn (ReferenceValue $value): bool => $value->category !== 'activity_outcome' || ! isset($value->metadata['activity_types']) || in_array('visit', $value->metadata['activity_types'], true))->groupBy('category');
 
         return view('livewire.rider.tasks.show', [

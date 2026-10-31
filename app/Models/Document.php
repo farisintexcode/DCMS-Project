@@ -30,6 +30,12 @@ class Document extends Model
         return $this->morphTo();
     }
 
+    /** M06 / UI23: stable display reference; original evidence bytes remain untouched. */
+    public function proofReference(): string
+    {
+        return 'IMG-'.$this->id.'-'.strtoupper(substr(str_replace('-', '', $this->public_id), -8));
+    }
+
     public function uploader(): BelongsTo
     {
         return $this->belongsTo(User::class, 'uploaded_by');

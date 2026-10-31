@@ -52,11 +52,10 @@
         @can('attendance.view_own')<x-sidebar-item label="Attendance" icon="clock" :href="route('rider.attendance')" :active="request()->routeIs('rider.attendance')" />@endcan
         <div class="sidebar-divider" x-show="!query.trim()"></div>
         <x-sidebar-item label="Notifications" icon="bell" :href="route('rider.notifications')" :active="request()->routeIs('rider.notifications')" />
-        <x-sidebar-item label="Profile & settings" icon="settings" :href="route('account.settings')" :active="request()->routeIs('account.settings')" />
         <div class="rider-menu-appearance sidebar-label"><span>Appearance</span><x-theme-toggle /></div>
     @endif
     </nav><p x-cloak x-show="query.trim() && ![...$refs.navigationItems.querySelectorAll('[data-nav-search]')].some(el => matches(el.dataset.navSearch))" class="sidebar-label px-3 py-6 text-xs leading-6 text-ink-500" role="status">No matching pages. Try another menu name.</p></div>
-    <div @class(['sidebar-footer', 'rider-side-footer' => $portal === 'rider'])>@if($portal === 'rider')<form method="POST" action="{{ route('logout') }}">@csrf<button type="submit" class="rider-logout"><x-icon name="logout" />Sign out</button></form>@endif<span class="sidebar-label text-[10px] leading-5 text-ink-500">Nexora<br>Debt Collection Management System</span>@if($portal === 'admin')<button type="button" class="sidebar-collapse grid size-11 shrink-0 place-items-center rounded-xl border border-white/20 hover:bg-white/10" :aria-label="rail ? 'Expand sidebar' : 'Collapse sidebar'" :aria-expanded="!rail" aria-controls="admin-navigation" @click="toggleCompact()"><x-icon name="panel" /></button>@endif</div>
+    <div @class(['sidebar-footer', 'rider-side-footer' => $portal === 'rider'])><span class="sidebar-label text-[10px] leading-5 text-ink-500">Nexora<br>Debt Collection Management System</span>@if($portal === 'admin')<button type="button" class="sidebar-collapse grid size-11 shrink-0 place-items-center rounded-xl border border-white/20 hover:bg-white/10" :aria-label="rail ? 'Expand sidebar' : 'Collapse sidebar'" :aria-expanded="!rail" aria-controls="admin-navigation" @click="toggleCompact()"><x-icon name="panel" /></button>@endif</div>
 </aside>
 <x-sidebar-tooltip />
 

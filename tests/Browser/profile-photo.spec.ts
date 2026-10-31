@@ -14,8 +14,8 @@ for (const portal of ['admin', 'rider'] as const) {
         await page.getByLabel('Password', { exact: true }).fill(password!);
         await page.getByRole('button', { name: 'Sign in', exact: true }).click();
         await expect(page).toHaveURL(portal === 'admin' ? /\/admin$/ : /\/rider$/);
-        await page.goto('/account');
-        await expect(page.getByRole('heading', { name: 'Change password', exact: true })).toBeVisible();
+        await page.goto(portal === 'admin' ? '/account' : '/rider/profile');
+        await expect(page.getByRole('heading', { name: portal === 'admin' ? 'Change password' : 'My Profile', exact: true })).toBeVisible();
         const edit = page.getByRole('button', { name: 'Edit profile photo', exact: true });
         await expect(edit).toBeVisible();
         await expect(edit).toHaveCSS('background-color', 'rgb(251, 133, 0)');

@@ -50,6 +50,6 @@ class CollectionActivity extends Model
 
     public function inspection(): HasOne
     {
-        return $this->hasOne(PropertyInspection::class, 'activity_id');
+        return $this->hasOne(PropertyInspection::class, 'activity_id')->latestOfMany();
     }
 }

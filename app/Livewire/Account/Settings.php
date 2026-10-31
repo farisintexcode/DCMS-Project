@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Account;
 
-use App\Actions\Account\SaveProfilePhoto;
 use App\Models\User;
 use App\Services\AuditWriter;
 use Illuminate\Support\Facades\Auth;
@@ -11,47 +10,11 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
 use Livewire\Component;
-use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
-use Livewire\WithFileUploads;
 
-/** Module.md M01 / Prototype.md UI05; Database.md users/documents, own account settings. */
+/** Module.md M01 / Prototype.md UI05; own user identity, password and private Document avatar. */
 class Settings extends Component
 {
-    use WithFileUploads;
-
-    public ?TemporaryUploadedFile $photo = null;
-
-    public float $photoZoom = 1;
-
-    public float $photoX = 50;
-
-    public float $photoY = 50;
-
-    public function savePhoto(SaveProfilePhoto $photos): void
-    {
-        abort_unless(Auth::user()?->canManageOwnProfilePhoto(), 403);
-        $this->validate(SaveProfilePhoto::rules());
-        $photos->handle(Auth::user(), $this->photo, $this->photoZoom, $this->photoX, $this->photoY);
-        Auth::user()->unsetRelation('profilePhoto');
-        $this->cancelPhoto();
-        $this->redirectRoute('account.settings');
-        session()->flash('status', 'Your profile picture has been updated.');
-    }
-
-    public function cancelPhoto(): void
-    {
-        $this->reset('photo', 'photoZoom', 'photoX', 'photoY');
-        $this->resetValidation(['photo', 'photoZoom', 'photoX', 'photoY']);
-    }
-
-    public function removePhoto(SaveProfilePhoto $photos): void
-    {
-        abort_unless(Auth::user()?->canManageOwnProfilePhoto(), 403);
-        $photos->remove(Auth::user());
-        $this->cancelPhoto();
-        $this->redirectRoute('account.settings');
-        session()->flash('status', 'Your profile picture has been removed.');
-    }
+    use EditsProfilePhoto;
 
     public string $current_password = '';
 
@@ -81,6 +44,6 @@ class Settings extends Component
     {
         abort_unless(Auth::user()?->isActive(), 403);
 
-        return view('livewire.account.settings')->layout(Auth::user()->can('admin.access') ? 'layouts.admin' : 'layouts.rider');
+        return view(Auth::user()->can('admin.access') ? 'livewire.account.settings' : 'livewire.rider.account-settings')->layout(Auth::user()->can('admin.access') ? 'layouts.admin' : 'layouts.rider');
     }
 }

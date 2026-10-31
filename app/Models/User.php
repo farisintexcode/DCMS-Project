@@ -45,6 +45,11 @@ class User extends Authenticatable
         });
     }
 
+    public function canManageOwnProfilePhoto(): bool
+    {
+        return $this->isActive() && ($this->can('admin.access') || $this->canUseRiderInterface());
+    }
+
     public function clientScopes(): HasMany
     {
         return $this->hasMany(UserClientScope::class);
@@ -58,11 +63,6 @@ class User extends Authenticatable
     public function canUseRiderInterface(): bool
     {
         return $this->isActive() && $this->can('rider.access') && $this->staff()->where('is_active', true)->where('is_rider', true)->exists();
-    }
-
-    public function canManageOwnProfilePhoto(): bool
-    {
-        return $this->isActive() && ($this->can('admin.access') || $this->canUseRiderInterface());
     }
 
     public function hasClientScope(Client $client): bool
