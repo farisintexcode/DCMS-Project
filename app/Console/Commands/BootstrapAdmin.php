@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\Password;
 
-/** Out-of-band local provisioning; never commits credentials or grants implicit client access. */
+/** Out-of-band local provisioning; never commits credentials. */
 class BootstrapAdmin extends Command
 {
     protected $signature = 'dcms:bootstrap-admin {email} {--name=Administrator}';
@@ -42,10 +42,10 @@ class BootstrapAdmin extends Command
             $user->email_verified_at = now();
             $user->save();
             $user->assignRole('Admin');
-            $user->givePermissionTo(['roles.manage', 'scopes.manage', 'users.invite']);
+            $user->givePermissionTo(['roles.manage', 'users.invite']);
             $audit->record($user, 'bootstrap_admin', metadata: ['role' => 'Admin'], reason: 'Initial local development account');
         });
-        $this->info('Admin provisioned. Client access requires an explicit scope grant.');
+        $this->info('Admin provisioned.');
 
         return self::SUCCESS;
     }

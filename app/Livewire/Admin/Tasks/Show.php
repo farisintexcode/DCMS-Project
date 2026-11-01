@@ -24,14 +24,14 @@ class Show extends Component
 
     public function render(): View
     {
-        $task = Task::query()->with(['batch.client', 'account.property', 'customer', 'currentAllocation.collector', 'history.actor', 'allocations.collector'])->where('public_id', $this->taskId)->firstOrFail();
-        abort_unless(Auth::user()->hasClientScope($task->batch->client), 404);
+        $task = Task::query()->with(['batch', 'account.property', 'customer', 'currentAllocation.collector', 'history.actor', 'allocations.collector'])->where('public_id', $this->taskId)->firstOrFail();
+        abort_unless(Auth::user()->isActive(), 404);
         Gate::authorize('view', $task);
 
         return view('livewire.admin.tasks.show', [
             'task' => $task,
             'visits' => $task->activities()->where('activity_type_code', 'visit')->with(['performer', 'inspection', 'followUps'])->latest('id')->limit(30)->get(),
-            'submissions' => $task->submissions()->with(['task.batch.client', 'submitter', 'documents.document', 'review.reviewer'])->latest('submission_version')->limit(20)->get(),
+            'submissions' => $task->submissions()->with(['task.batch', 'submitter', 'documents.document', 'review.reviewer'])->latest('submission_version')->limit(20)->get(),
             'proof' => Document::query()->where('owner_type', 'task')->where('owner_id', $task->id)->where('document_type_code', 'proof_image')->latest('id')->limit(30)->get(),
         ]);
     }

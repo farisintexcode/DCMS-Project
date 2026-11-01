@@ -21,19 +21,18 @@ beforeEach(function (): void {
 
 function attentionTask(AssignmentBatch $batch, array $attributes = []): Task
 {
-    return Task::factory()->create(['assignment_batch_id' => $batch->id, 'debt_account_id' => DebtAccount::factory()->create(['client_id' => $batch->client_id])->id, ...$attributes]);
+    return Task::factory()->create(['assignment_batch_id' => $batch->id, 'debt_account_id' => DebtAccount::factory()->create()->id, ...$attributes]);
 }
 
-test('task attention counts match their linked task filters and stay within client scope', function (): void {
-    [$user, $client] = customerOperator();
-    $batch = AssignmentBatch::factory()->create(['client_id' => $client->id, 'due_date' => '2026-12-31']);
+test('task attention counts match their linked task filters', function (): void {
+    $user = staffManager();
+    $batch = AssignmentBatch::factory()->create(['due_date' => '2026-12-31']);
     attentionTask($batch, ['work_status' => 'submitted', 'review_status' => 'pending', 'submitted_at' => '2026-10-28 04:00:00']);
     attentionTask($batch, ['due_at' => '2026-10-30 00:00:00']);
     attentionTask($batch, ['work_status' => 'in_progress', 'review_status' => 'returned']);
     $allocated = attentionTask($batch);
     TaskAllocation::factory()->create(['task_id' => $allocated->id, 'collector_id' => Staff::factory()->create()->id]);
     attentionTask($batch, ['work_status' => 'completed', 'review_status' => 'approved', 'due_at' => '2026-10-29 00:00:00']);
-    attentionTask(AssignmentBatch::factory()->create(), ['due_at' => '2026-10-30 00:00:00']);
 
     $items = collect(app(AttentionQueue::class)->forUser($user))->keyBy('key');
 
@@ -46,9 +45,9 @@ test('task attention counts match their linked task filters and stay within clie
 });
 
 test('tasks without their own due time become overdue after their batch due date ends locally', function (): void {
-    [$user, $client] = customerOperator();
-    attentionTask(AssignmentBatch::factory()->create(['client_id' => $client->id, 'start_date' => '2026-10-01', 'due_date' => '2026-10-30']));
-    attentionTask(AssignmentBatch::factory()->create(['client_id' => $client->id, 'start_date' => '2026-10-01', 'due_date' => '2026-10-31']));
+    $user = staffManager();
+    attentionTask(AssignmentBatch::factory()->create(['start_date' => '2026-10-01', 'due_date' => '2026-10-30']));
+    attentionTask(AssignmentBatch::factory()->create(['start_date' => '2026-10-01', 'due_date' => '2026-10-31']));
 
     $items = collect(app(AttentionQueue::class)->forUser($user))->keyBy('key');
 

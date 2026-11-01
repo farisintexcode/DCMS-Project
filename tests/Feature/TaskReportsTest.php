@@ -11,7 +11,6 @@ use App\Models\OutboxEvent;
 use App\Models\Task;
 use App\Models\TaskAllocation;
 use App\Models\User;
-use App\Models\UserClientScope;
 use App\Services\Reports\ReportRenderer;
 use App\Services\Reports\TaskReports;
 use Database\Seeders\DatabaseSeeder;
@@ -35,16 +34,15 @@ beforeEach(function (): void {
 });
 function reportFixture(): array
 {
-    [$actor,$client] = customerOperator();
-    UserClientScope::query()->where('user_id', $actor->id)->update(['valid_from' => now()->subMinute()]);
-    $batch = AssignmentBatch::factory()->create(['client_id' => $client->id]);
-    $task = Task::factory()->create(['assignment_batch_id' => $batch->id, 'debt_account_id' => DebtAccount::factory()->create(['client_id' => $client->id])->id]);
+    $actor = staffManager();
+    $batch = AssignmentBatch::factory()->create();
+    $task = Task::factory()->create(['assignment_batch_id' => $batch->id, 'debt_account_id' => DebtAccount::factory()->create()->id]);
 
     return [$actor, $task];
 }
 function reportCriteria(array $overrides = []): array
 {
-    return array_replace(['family' => 'task', 'from' => '', 'until' => '', 'client' => '', 'batch' => '', 'rider' => '', 'status' => '', 'iwk' => '', 'columns' => TaskReports::DEFAULT_COLUMNS], $overrides);
+    return array_replace(['family' => 'task', 'from' => '', 'until' => '', 'batch' => '', 'rider' => '', 'status' => '', 'iwk' => '', 'columns' => TaskReports::DEFAULT_COLUMNS], $overrides);
 }
 
 test('reports require active administrative report and source access', function () {
@@ -59,14 +57,11 @@ test('reports require active administrative report and source access', function 
     $this->get(route('admin.reports.index'))->assertForbidden();
 });
 
-test('report snapshots exclude foreign tasks mask accounts and reconcile their totals', function () {
+test('report snapshots mask accounts and reconcile their totals', function () {
     [$actor,$task] = reportFixture();
-    $foreign = Task::factory()->create();
     $snapshot = app(TaskReports::class)->snapshot($actor, reportCriteria(['columns' => array_keys(TaskReports::COLUMNS)]));
     expect($snapshot['task_ids'])->toBe([$task->public_id])->and($snapshot['totals']['tasks'])->toBe(1)->and($snapshot['totals']['completed'])->toBe(0)->and($snapshot['rows'][0]['account_reference'])->not->toBe($task->account->account_number);
-    expect(json_encode($snapshot))->not->toContain($foreign->public_id)->not->toContain($task->customer->display_name_ciphertext);
-    UserClientScope::query()->where('user_id', $actor->id)->update(['valid_to' => now()]);
-    expect(app(TaskReports::class)->snapshot($actor, reportCriteria())['rows'])->toBe([]);
+    expect(json_encode($snapshot))->not->toContain($task->customer->display_name_ciphertext);
 });
 
 test('criteria reject invalid dates columns families and excessive snapshots', function () {
@@ -81,7 +76,7 @@ test('criteria reject invalid dates columns families and excessive snapshots', f
     expect(fn () => $reports->snapshot($actor, reportCriteria()))->toThrow(ValidationException::class);
 });
 
-test('Rider assignment and performance reports use only currently allocated scoped tasks', function () {
+test('Rider assignment and performance reports use only currently allocated tasks', function () {
     [$actor,$task] = reportFixture();
     $allocation = TaskAllocation::factory()->create(['task_id' => $task->id]);
     $reports = app(TaskReports::class);
@@ -112,7 +107,7 @@ test('CSV export freezes values encrypts storage and handles duplicate queue del
     expect($manage->bytes($doc))->toContain($task->public_id);
 });
 
-test('private downloads require signature owner current scope and expiry and detect tampering', function () {
+test('private downloads require signature owner and expiry and detect tampering', function () {
     [$actor] = reportFixture();
     $manage = app(ManageReports::class);
     $job = $manage->request($actor, reportCriteria(), 'csv');
@@ -126,14 +121,12 @@ test('private downloads require signature owner current scope and expiry and det
     $this->actingAs($actor);
     Storage::disk('s3')->put($job->artifact->object_key, Crypt::encryptString('tampered'));
     $this->get($url)->assertStatus(503);
-    UserClientScope::query()->where('user_id', $actor->id)->update(['valid_to' => now()]);
-    $this->get($url)->assertForbidden();
     $this->travel(25)->hours();
     $url = URL::temporarySignedRoute('admin.reports.download', now()->addMinutes(5), ['exportJob' => $job->public_id, 'user' => $actor->id]);
     $this->get($url)->assertGone();
 });
 
-test('queued exports cancel after scope revocation and failed exports require explicit authorized retry', function () {
+test('queued exports cancel after permission revocation and failed exports require explicit authorized retry', function () {
     [$actor] = reportFixture();
     $manage = app(ManageReports::class);
     $job = $manage->request($actor, reportCriteria(), 'csv');
@@ -141,7 +134,7 @@ test('queued exports cancel after scope revocation and failed exports require ex
     expect($job->refresh()->status)->toBe('failed');
     $manage->retry($actor, $job);
     expect($job->refresh()->status)->toBe('queued')->and(OutboxEvent::query()->where('event_type', 'report.generate')->count())->toBe(2);
-    UserClientScope::query()->where('user_id', $actor->id)->update(['valid_to' => now()]);
+    $actor->syncRoles([]);
     $manage->generate($job->id);
     expect($job->refresh()->status)->toBe('cancelled')->and(Document::query()->where('owner_type', 'export')->count())->toBe(0);
 });

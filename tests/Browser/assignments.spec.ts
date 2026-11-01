@@ -13,10 +13,6 @@ test('assignment metadata editing and confirmed archival preserve usable desktop
     await expect(page).toHaveURL(/\/admin$/, { timeout: 90000 });
     await page.goto('/admin/assignments');
     await page.getByRole('link', { name: 'New assignment', exact: true }).click();
-    const clientPicker = page.getByLabel('Commissioning client', { exact: true });
-    if (await clientPicker.count()) {
-        await clientPicker.selectOption({ label: 'Synthetic Client' });
-    }
     await page.getByLabel('Assignment type', { exact: true }).selectOption('domestic_dr');
     await page.getByLabel('Assignment name', { exact: true }).fill(name);
     await page.getByLabel('Assignment due date', { exact: true }).fill(new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10));
@@ -30,7 +26,6 @@ test('assignment metadata editing and confirmed archival preserve usable desktop
     }
     await page.getByRole('button', { name: 'Save assignment', exact: true }).click();
     await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
-    await expect(page.getByLabel('Commissioning client', { exact: true })).toBeDisabled();
     await page.getByLabel('Assignment name', { exact: true }).fill(`Updated ${name}`);
     await page.getByRole('button', { name: 'Update assignment', exact: true }).click();
     await expect(page.getByRole('heading', { name: `Updated ${name}`, exact: true })).toBeVisible();

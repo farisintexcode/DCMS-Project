@@ -22,11 +22,6 @@ class DebtAccount extends Model
         return ['status' => 'string'];
     }
 
-    public function client(): BelongsTo
-    {
-        return $this->belongsTo(Client::class);
-    }
-
     public function property(): BelongsTo
     {
         return $this->belongsTo(Property::class);

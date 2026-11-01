@@ -13,15 +13,15 @@ Read these before implementing any feature:
 
 These four documents remain the single source of truth. Confirmed C scope overrides historical reference O/U evidence. Implementation notes: [review/dependencies](docs/foundation-review.md), [architecture](docs/architecture.md), [all 66 entity dispositions](docs/entity-register.md). Notes are tracking aids, not replacement requirements.
 
-Customer means `debtors` / `Debtor`; Rider means eligible `staff` linked one-to-one through `users.staff_id`. Client is the commissioning company. Do not introduce duplicate customers/rider_profiles/task_assignments/attachments/task_verifications tables.
+Customer means `debtors` / `Debtor`; Rider means eligible `staff` linked one-to-one through `users.staff_id`. Do not introduce duplicate customers/rider_profiles/task_assignments/attachments/task_verifications tables.
 
 ## This increment
 
 - Official Laravel 13 skeleton and included Composer/npm lockfiles.
 - Sail PHP 8.4, PostgreSQL 17, Redis 7.4 and a local Mailpit sink configuration.
 - Session login/logout, throttling, password broker/recovery/reset, invitation-only activation endpoint and own password changes. Approved terms/privacy configuration is required for activation. Public registration is absent.
-- Admin/Rider role bundles, granular permissions, active account/staff checks, explicit effective client scopes and a client policy. No role-name bypass. Employment positions are separate reference values.
-- Dependency-ordered identity/reference/client/scope migrations; UUID v7 public references, PostgreSQL checks/partial indexes/FKs; encrypted staff contact casts.
+- Admin/Rider role bundles, granular permissions, active account/staff checks, No role-name bypass. Employment positions are separate reference values.
+- Dependency-ordered identity/reference migrations; UUID v7 public references, PostgreSQL checks/partial indexes/FKs; encrypted staff contact casts.
 - Append-only audit, outbox/deduplication persistence and notification schema. M04 now publishes only import events through its durable outbox dispatcher.
 - Responsive Admin and mobile Rider layouts, reusable Blade inputs/buttons/feedback, Livewire account settings and real customer/task KPIs. Navigation labels remaining modules.
 - S3 private disk configuration, separate provider contracts for email, WhatsApp messaging and calling; no selected or enabled provider.
@@ -58,7 +58,7 @@ Configure the existing private S3 bucket/region/credentials, block public bucket
 
 Initial configurable limits: 10 MiB source, 2,000 data rows, 100 columns, 10 sheets, 64 MiB expanded XLSX; header selection is rows 1–100. These are implementation bounds, not historical workbook assumptions. XLSX/XLS parsing uses PhpSpreadsheet 5.10. Macro/embedded/external content, executable sheets, formulas, encrypted/unreadable workbooks and exceeded limits are rejected. Dates must be ISO `YYYY-MM-DD`; identifiers should be text. Existing zero-padding number formats are preserved, but precision already lost in Excel cannot be reconstructed.
 
-Customer matching is exact client + customer reference; Batch matching is exact client + **required external reference**. Preview exercises the existing save actions inside a rolled-back savepoint; target revisions and accepted row payloads are then frozen. Processing rechecks current permissions/scopes and revisions and commits each target, row disposition and count atomically. Duplicate submissions reuse an existing intake; a failed frozen attempt can be uploaded again as a separate fresh review, preserving the previous attempt. Retrying a stale revision does not silently refresh it. Only mapped optional fields are updated; the first Customer contract covers reference, party type, name, status and optional identity, without replacing contacts, addresses or categories.
+Customer matching is the exact customer reference; Batch matching is the exact **required external reference**. Preview exercises the existing save actions inside a rolled-back savepoint; target revisions and accepted row payloads are then frozen. Processing rechecks current permissions/scopes and revisions and commits each target, row disposition and count atomically. Duplicate submissions reuse an existing intake; a failed frozen attempt can be uploaded again as a separate fresh review, preserving the previous attempt. Retrying a stale revision does not silently refresh it. Only mapped optional fields are updated; the first Customer contract covers reference, party type, name, status and optional identity, without replacing contacts, addresses or categories.
 
 Account/task import adapters await approved source contracts, including G02; payment/databank adapters also await their modules and G05. Task/account target columns now have real foreign keys and remain null-constrained until the corresponding adapters are activated. Initial system template definitions have a nullable creator because normal seeding does not invent a user; user-created versions always record the creator. Source retention is not automatically shortened or deleted without the approved retention policy. Error CSVs are streamed on demand after a fresh access check and audit, without raw workbook values.
 
@@ -107,13 +107,11 @@ docker run --rm -u "$(id -u):$(id -g)" \
 ./vendor/bin/sail artisan dcms:bootstrap-admin you@example.test --name="Your name"
 ```
 
-The bootstrap command prompts for a strong password and only runs in `local` before the first user exists. It creates Admin plus explicit roles.manage/scopes.manage/users.invite grants, with audit. No accounts or passwords are seeded by the normal DatabaseSeeder. It grants no client portfolio access. Existing accounts and role bundles do not acquire these reserved grants automatically.
+The bootstrap command prompts for a strong password and only runs in `local` before the first user exists. It creates Admin plus explicit roles.manage/users.invite grants, with audit. No accounts or passwords are seeded by the normal DatabaseSeeder. It grants no client portfolio access. Existing accounts and role bundles do not acquire these reserved grants automatically.
 
 The Riders & staff workspace requires `admin.access` and `riders.manage`. Employment records do not create login accounts or grant roles. A separate invitation action requires `users.invite`; selecting Admin also requires `roles.manage`. Invitations never merge existing identities or add client scopes. Staff contact changes leave active account login emails unchanged. Disabling staff or removing Rider eligibility requires a reason and checks outstanding current allocations; self-removal is refused. Existing sessions enforce staff status on their next request.
 
 The approved policy configuration supplied by the project owner is `DCMS Staff Terms v1.0` and `https://dcms.intexcode.com/privacy-policy`. The URL's live availability was not verified. Invitations use expiring, single-use password-broker tokens and send after the account transaction commits. The native preview uses the array mail transport: preparation is explicitly reported as local capture, not delivery. Configure Mailpit or an approved SMTP transport to receive messages; `MAIL_TIMEOUT` defaults to 15 seconds. Log mail transports, including failover to logs, are blocked for invitations to avoid recording activation secrets. Transport acceptance is not proof of inbox delivery.
-
-To explicitly provision your first local client and portfolio scope before the client/scope administration UI arrives, run `./vendor/bin/sail artisan dcms:provision-local-client CLIENT_CODE "Client name" you@example.test`. This local-only command requires an active account with `scopes.manage` and audits both records. It does not grant any other user's access.
 
 Customer search requires `DCMS_SEARCH_KEY`, independent of `APP_KEY`. Keep it stable and private: changing it requires rebuilding all customer HMAC search tokens and identity/contact fingerprints before search resumes. Search text stays out of URLs. Full identifiers require the separate `customers.view_sensitive` grant, excluded from ordinary Admin bundles; masked identifiers are the default.
 
@@ -156,7 +154,7 @@ npx playwright install chromium
 PLAYWRIGHT_BASE_URL=http://localhost npm run test:e2e
 ```
 
-Credential-based cases skip unless their `DCMS_E2E_ADMIN_EMAIL`, `DCMS_E2E_RIDER_EMAIL` and `DCMS_E2E_PASSWORD` are supplied. For full browser acceptance use a dedicated local/test database ending `_e2e`, generate a temporary runtime password, migrate it, and explicitly run BrowserTestSeeder with that password in the environment. It provisions `admin@example.test`, an explicitly scoped synthetic client, a foreign-client control record and `rider@example.test`; both accounts use the runtime secret. Start the app against that database, supply those email variables to Playwright and discard fixtures afterwards. The GitLab template demonstrates the full setup. No test sends to real customers.
+Credential-based cases skip unless their `DCMS_E2E_ADMIN_EMAIL`, `DCMS_E2E_RIDER_EMAIL` and `DCMS_E2E_PASSWORD` are supplied. For full browser acceptance use a dedicated local/test database ending `_e2e`, generate a temporary runtime password, migrate it, and explicitly run BrowserTestSeeder with that password in the environment. It provisions `admin@example.test` and `rider@example.test`; both accounts use the runtime secret. Start the app against that database, supply those email variables to Playwright and discard fixtures afterwards. The GitLab template demonstrates the full setup. No test sends to real customers.
 
 Verified through 17 October 2026:
 

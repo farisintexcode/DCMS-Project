@@ -16,7 +16,6 @@ use App\Models\TaskAllocation;
 use App\Models\TaskSubmission;
 use App\Models\TaskSubmissionDocument;
 use App\Models\User;
-use App\Models\UserClientScope;
 use App\Services\Imports\MalwareScanner;
 use App\Services\Tasks\CompletionChecklist;
 use Database\Seeders\DatabaseSeeder;
@@ -43,8 +42,6 @@ function executionFixture(): array
     $task = Task::factory()->create();
     $rider = User::factory()->for(Staff::factory()->create())->create();
     $rider->assignRole('Rider');
-    $scope = new UserClientScope;
-    $scope->forceFill(['user_id' => $rider->id, 'client_id' => $task->batch->client_id, 'granted_by' => $rider->id, 'reason' => 'Synthetic M06 portfolio', 'valid_from' => now()->subMinute()])->save();
     TaskAllocation::factory()->create(['task_id' => $task->id, 'collector_id' => $rider->staff_id]);
 
     return [$rider, $task->refresh()];
@@ -79,7 +76,7 @@ function executionSubmit(User $rider, Task $task, ?string $key = null): TaskSubm
     return app(RiderWork::class)->submit($rider, $task, $task->lock_version, $key ?? (string) Str::uuid7(), $review['digest']);
 }
 
-test('Rider routes enforce active interface client scope and current allocation without exposing identifiers', function (): void {
+test('Rider routes enforce active interface and current allocation without exposing identifiers', function (): void {
     [$rider,$task] = executionFixture();
     $task->customer->identity_ciphertext = 'PRIVATE-IDENTIFIER';
     $task->customer->save();
@@ -91,8 +88,6 @@ test('Rider routes enforce active interface client scope and current allocation 
     [$other,$otherTask] = executionFixture();
     $this->get(route('rider.tasks.show', $otherTask))->assertNotFound();
     $this->actingAs($other)->get(route('rider.tasks.show', $task))->assertNotFound();
-    $rider->clientScopes()->update(['valid_to' => now()->format('Y-m-d H:i:s.uP')]);
-    $this->actingAs($rider)->get(route('rider.tasks.show', $task))->assertNotFound();
 });
 
 test('start is atomic idempotent and rejects stale cancelled archived and withdrawn permission work', function (): void {
@@ -247,7 +242,6 @@ test('reassignment denies editing and proof while retaining only own masked subm
     $submission = executionSubmit($rider, $task);
     $task->currentAllocation->released_at = now();
     $task->currentAllocation->save();
-    $this->actingAs($rider)->get(route('rider.tasks.show', $task))->assertNotFound();
     $this->get(route('proof.show', $document))->assertNotFound();
     $this->get(route('rider.tasks.history', $submission))->assertOk()->assertDontSee('Synthetic inspection performed')->assertDontSee($task->account->account_number);
     [$other] = executionFixture();
@@ -309,7 +303,7 @@ test('rejected scans cannot be retried as clean and draft deletion preserves a r
     expect(app(CompletionChecklist::class)->review($task->refresh(), $rider)['issues'])->toHaveKey('proof');
 });
 
-test('proof is bounded by content dimensions count and same-client visit ownership', function (): void {
+test('proof is bounded by content dimensions count and same-task visit ownership', function (): void {
     Storage::fake('s3');
     [$rider,$task] = executionFixture();
     executionVisit($rider, $task);

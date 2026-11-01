@@ -9,7 +9,6 @@ use App\Models\AccountParty;
 use App\Models\AssignmentBatch;
 use App\Models\Attendance;
 use App\Models\AttendanceSchedule;
-use App\Models\Client;
 use App\Models\Contact;
 use App\Models\DebtAccount;
 use App\Models\Debtor;
@@ -25,7 +24,6 @@ use App\Models\Staff;
 use App\Models\Task;
 use App\Models\TaskAllocation;
 use App\Models\User;
-use App\Models\UserClientScope;
 use App\Services\Customers\CustomerSearch;
 use App\Services\Tasks\CompletionChecklist;
 use Illuminate\Database\Seeder;
@@ -47,21 +45,13 @@ class BrowserTestSeeder extends Seeder
         $admin->givePermissionTo('communications.generate_letter');
         $admin->givePermissionTo('integrations.manage');
         $admin->givePermissionTo(['communication-permission.create', 'communication-permission.update', 'communication-permission.block', 'communication-permission.approve', 'communication-permission.override']);
-        $client = Client::factory()->create(['code' => 'SYNTHETIC', 'name' => 'Synthetic Client']);
-        $scope = new UserClientScope;
-        $scope->user_id = $admin->id;
-        $scope->client_id = $client->id;
-        $scope->granted_by = $admin->id;
-        $scope->valid_from = now()->subMinute();
-        $scope->reason = 'Synthetic browser portfolio';
-        $scope->save();
         foreach (['desktop', 'rider-mobile'] as $callSurface) {
-            $callCustomer = Debtor::factory()->for($client)->create(['customer_reference' => 'CALL-'.strtoupper($callSurface), 'display_name_ciphertext' => 'Synthetic Call Customer '.$callSurface]);
+            $callCustomer = Debtor::factory()->create(['customer_reference' => 'CALL-'.strtoupper($callSurface), 'display_name_ciphertext' => 'Synthetic Call Customer '.$callSurface]);
             Contact::factory()->create(['debtor_id' => $callCustomer->id, 'kind_code' => 'mobile', 'value_ciphertext' => '+60123456789', 'value_fingerprint' => app(CustomerSearch::class)->token('contact:mobile', '+60123456789')]);
         }
         // Historical synthetic UI fixture only; this does not bypass production scan or storage adapters.
-        $customer = Debtor::factory()->for($client)->create(['customer_reference' => 'IMPORT-UI-FIXTURE', 'display_name_ciphertext' => 'Synthetic Import Customer']);
-        $import = ImportBatch::factory()->create(['client_id' => $client->id, 'uploaded_by' => $admin->id, 'status' => 'mapping']);
+        $customer = Debtor::factory()->create(['customer_reference' => 'IMPORT-UI-FIXTURE', 'display_name_ciphertext' => 'Synthetic Import Customer']);
+        $import = ImportBatch::factory()->create(['uploaded_by' => $admin->id, 'status' => 'mapping']);
         $fields = ImportField::query()->whereIn('id', $import->template->schema_definition['field_ids'])->get();
         foreach ($fields as $column => $field) {
             $mapping = new ImportColumnMapping;
@@ -70,14 +60,11 @@ class BrowserTestSeeder extends Seeder
         $row = new ImportRow;
         $row->forceFill(['import_batch_id' => $import->id, 'sheet_name' => 'Intake', 'row_number' => 2, 'raw_payload_ciphertext' => ['IMPORT-UI-FIXTURE', 'person', 'Synthetic Import Customer', 'active'], 'normalized_payload_ciphertext' => ['operation' => 'create', 'changes' => ['name' => ['before' => '—', 'after' => 'Sy•••er']]], 'state' => 'processed', 'target_customer_id' => $customer->id, 'processed_at' => now()])->save();
         $import->forceFill(['input_count' => 1, 'accepted_count' => 1, 'processed_count' => 1, 'mapping_digest' => hash('sha256', 'synthetic historical UI fixture'), 'selected_sheet' => 'Intake', 'header_row_number' => 1, 'mapping_confirmed_by' => $admin->id, 'mapping_confirmed_at' => now(), 'confirmed_by' => $admin->id, 'confirmed_at' => now(), 'status' => 'completed', 'completed_at' => now()])->save();
-        Debtor::factory()->create(['customer_reference' => 'FOREIGN-SECRET', 'display_name_ciphertext' => 'Foreign client customer']);
         $rider = User::factory()->for(Staff::factory()->create())->create(['name' => 'Synthetic Rider', 'email' => 'rider@example.test', 'password' => config('dcms.e2e_password')]);
         $rider->assignRole('Rider');
         $rider->staff->first_name = 'Field';
         $rider->staff->last_name = 'Rider';
         $rider->staff->save();
-        $riderScope = new UserClientScope;
-        $riderScope->forceFill(['user_id' => $rider->id, 'client_id' => $client->id, 'granted_by' => $admin->id, 'reason' => 'Synthetic task portfolio', 'valid_from' => now()->subMinute()])->save();
         // M10 synthetic calendar/punch fixtures are confined to the guarded disposable E2E database.
         $admin->givePermissionTo('attendance.approve_correction');
         $attendancePolicy = app(ConfigureAttendance::class)->policy($admin, ['code' => 'browser-attendance', 'rules' => config('attendance.initial_rules')]);
@@ -86,25 +73,23 @@ class BrowserTestSeeder extends Seeder
             $attendanceUser = User::factory()->for($attendanceStaff)->create(['name' => 'Attendance '.$attendanceSurface, 'email' => 'attendance-'.$attendanceSurface.'@example.test', 'password' => config('dcms.e2e_password')]);
             $attendanceUser->assignRole('Rider');
             $attendanceUser->givePermissionTo('attendance.correct');
-            $attendanceScope = new UserClientScope;
-            $attendanceScope->forceFill(['user_id' => $attendanceUser->id, 'client_id' => $client->id, 'granted_by' => $admin->id, 'valid_from' => now()->subMinute(), 'reason' => 'Synthetic attendance scope'])->save();
             $historyDate = now()->timezone(config('dcms.business_timezone'))->subDays(2)->startOfDay();
             $historySchedule = AttendanceSchedule::factory()->create(['rider_id' => $attendanceStaff->id, 'policy_id' => $attendancePolicy->id, 'service_date' => $historyDate->toDateString(), 'scheduled_start_at' => $historyDate->copy()->setTime(9, 0)->utc(), 'scheduled_end_at' => $historyDate->copy()->setTime(18, 0)->utc(), 'authorized_by' => $admin->id]);
             Attendance::factory()->create(['rider_id' => $attendanceStaff->id, 'schedule_id' => $historySchedule->id, 'service_date' => $historyDate->toDateString(), 'raw_clock_in_at' => $historyDate->copy()->setTime(9, 0)->utc(), 'effective_clock_in_at' => $historyDate->copy()->setTime(9, 0)->utc(), 'raw_clock_out_at' => $historyDate->copy()->setTime(17, 0)->utc(), 'effective_clock_out_at' => $historyDate->copy()->setTime(17, 0)->utc(), 'clock_out_request_id' => (string) Str::uuid7(), 'status' => 'present', 'worked_minutes' => 420, 'lock_version' => 1]);
             app(ConfigureAttendance::class)->assign($admin, $attendanceStaff->public_id, $attendancePolicy->public_id, now()->timezone(config('dcms.business_timezone'))->toDateString(), now()->timezone(config('dcms.business_timezone'))->toDateString(), 'scheduled');
         }
-        Debtor::factory()->for($client)->create(['customer_reference' => 'TASK-UI', 'display_name_ciphertext' => 'Synthetic Task Customer']);
-        AssignmentBatch::factory()->for($client)->create(['created_by' => $admin->id, 'name' => 'Synthetic Task Batch', 'external_reference' => 'TASK-UI-BATCH']);
+        Debtor::factory()->create(['customer_reference' => 'TASK-UI', 'display_name_ciphertext' => 'Synthetic Task Customer']);
+        AssignmentBatch::factory()->create(['created_by' => $admin->id, 'name' => 'Synthetic Task Batch', 'external_reference' => 'TASK-UI-BATCH']);
         foreach (['desktop', 'rider-mobile'] as $surface) {
-            $customer = Debtor::factory()->for($client)->create(['customer_reference' => 'RIDER-'.strtoupper($surface), 'display_name_ciphertext' => 'Synthetic Field Customer '.$surface]);
-            $account = DebtAccount::factory()->for($client)->create(['account_number' => 'M06-'.strtoupper($surface)]);
+            $customer = Debtor::factory()->create(['customer_reference' => 'RIDER-'.strtoupper($surface), 'display_name_ciphertext' => 'Synthetic Field Customer '.$surface]);
+            $account = DebtAccount::factory()->create(['account_number' => 'M06-'.strtoupper($surface)]);
             AccountParty::factory()->create(['debt_account_id' => $account->id, 'debtor_id' => $customer->id]);
-            $batch = AssignmentBatch::factory()->for($client)->create(['created_by' => $admin->id, 'name' => 'Synthetic Rider Batch '.$surface]);
+            $batch = AssignmentBatch::factory()->create(['created_by' => $admin->id, 'name' => 'Synthetic Rider Batch '.$surface]);
             $task = Task::factory()->create(['debt_account_id' => $account->id, 'customer_id' => $customer->id, 'assignment_batch_id' => $batch->id, 'created_by' => $admin->id, 'scheduled_visit_at' => now(), 'due_at' => now()->addDay(), 'special_instruction_ciphertext' => 'Synthetic field work only. No receipt is recorded.']);
             TaskAllocation::factory()->create(['task_id' => $task->id, 'collector_id' => $rider->staff_id, 'assigned_by' => $admin->id]);
             foreach (['approve', 'return'] as $reviewPath) {
-                $reviewCustomer = Debtor::factory()->for($client)->create(['customer_reference' => 'VERIFY-'.strtoupper($reviewPath.'-'.$surface), 'display_name_ciphertext' => 'Synthetic Verification '.$reviewPath.' '.$surface]);
-                $reviewAccount = DebtAccount::factory()->for($client)->create(['account_number' => 'M07-'.strtoupper($reviewPath.'-'.$surface)]);
+                $reviewCustomer = Debtor::factory()->create(['customer_reference' => 'VERIFY-'.strtoupper($reviewPath.'-'.$surface), 'display_name_ciphertext' => 'Synthetic Verification '.$reviewPath.' '.$surface]);
+                $reviewAccount = DebtAccount::factory()->create(['account_number' => 'M07-'.strtoupper($reviewPath.'-'.$surface)]);
                 AccountParty::factory()->create(['debt_account_id' => $reviewAccount->id, 'debtor_id' => $reviewCustomer->id]);
                 $reviewTask = Task::factory()->create(['debt_account_id' => $reviewAccount->id, 'customer_id' => $reviewCustomer->id, 'assignment_batch_id' => $batch->id, 'created_by' => $admin->id]);
                 TaskAllocation::factory()->create(['task_id' => $reviewTask->id, 'collector_id' => $rider->staff_id, 'assigned_by' => $admin->id]);

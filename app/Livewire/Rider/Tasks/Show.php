@@ -175,7 +175,7 @@ class Show extends Component
     public function render(CompletionChecklist $checklist): View
     {
         Gate::authorize('use-rider-interface');
-        $task = $this->task()->load(['batch.client', 'customer.contacts', 'account.property', 'currentAllocation']);
+        $task = $this->task()->load(['batch', 'customer.contacts', 'account.property', 'currentAllocation']);
         if (! in_array($this->section, ['overview', 'customer', 'visit', 'business', 'proof', 'completion', 'history'], true)) {
             $this->section = 'overview';
         }

@@ -4,7 +4,6 @@ namespace App\Livewire\Admin\Customers;
 
 use App\Models\CustomerCategory;
 use App\Models\Debtor;
-use App\Services\ClientAccess;
 use App\Services\Customers\CustomerSearch;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -19,9 +18,6 @@ use Livewire\WithPagination;
 class Index extends Component
 {
     use WithPagination;
-
-    #[Url]
-    public string $client = '';
 
     #[Url]
     public string $status = '';
@@ -59,7 +55,7 @@ class Index extends Component
 
     public function resetFilters(): void
     {
-        $this->reset('client', 'status', 'type', 'category', 'sort', 'query', 'searchBy', 'perPage');
+        $this->reset('status', 'type', 'category', 'sort', 'query', 'searchBy', 'perPage');
         session()->forget('customer_search.'.Auth::id());
         $this->resetPage();
     }
@@ -67,12 +63,10 @@ class Index extends Component
     public function render(): View
     {
         Gate::authorize('viewAny', Debtor::class);
-        $access = app(ClientAccess::class);
-        $clients = $access->clients(Auth::user())->orderBy('name')->get();
-        $query = $access->scope(Debtor::query(), Auth::user())->with(['client', 'categoryAssignments' => fn ($q) => $q->whereNull('revoked_at')->with('category')]);
-        foreach (['client_id' => $this->client, 'status' => $this->status, 'party_type' => $this->type] as $field => $value) {
+        $query = Debtor::query()->with(['categoryAssignments' => fn ($q) => $q->whereNull('revoked_at')->with('category')]);
+        foreach (['status' => $this->status, 'party_type' => $this->type] as $field => $value) {
             if ($value !== '') {
-                $query->where($field, $field === 'client_id' ? (int) $value : $value);
+                $query->where($field, $value);
             }
         }
         if ($this->category !== '') {
@@ -84,10 +78,10 @@ class Index extends Component
             app(CustomerSearch::class)->apply($query, $this->searchBy, $this->query);
         }
         $this->sort === 'reference' ? $query->orderBy('customer_reference')->orderBy('id') : $query->orderByDesc('id');
-        $categories = $access->scope(CustomerCategory::query(), Auth::user())->when($this->client !== '', fn ($q) => $q->where('client_id', (int) $this->client))->orderBy('name')->get();
+        $categories = CustomerCategory::query()->orderBy('name')->get();
 
         $size = in_array($this->perPage, ['25', '50', '100'], true) ? (int) $this->perPage : 25;
 
-        return view('livewire.admin.customers.index', ['customers' => $query->paginate($size), 'clients' => $clients, 'categories' => $categories]);
+        return view('livewire.admin.customers.index', ['customers' => $query->paginate($size), 'categories' => $categories]);
     }
 }

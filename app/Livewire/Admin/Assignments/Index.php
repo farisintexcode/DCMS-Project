@@ -4,7 +4,6 @@ namespace App\Livewire\Admin\Assignments;
 
 use App\Models\AssignmentBatch;
 use App\Models\ReferenceValue;
-use App\Services\ClientAccess;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
@@ -22,9 +21,6 @@ class Index extends Component
 
     #[Url]
     public string $status = 'active';
-
-    #[Url]
-    public string $client = '';
 
     #[Url]
     public string $type = '';
@@ -63,24 +59,21 @@ class Index extends Component
 
     private function filters(): array
     {
-        return array_filter(['status' => $this->status, 'client' => $this->client, 'type' => $this->type, 'state' => $this->state, 'from' => $this->from, 'until' => $this->until, 'sort' => $this->sort, 'perPage' => $this->perPage], fn ($value) => $value !== '');
+        return array_filter(['status' => $this->status, 'type' => $this->type, 'state' => $this->state, 'from' => $this->from, 'until' => $this->until, 'sort' => $this->sort, 'perPage' => $this->perPage], fn ($value) => $value !== '');
     }
 
     public function resetFilters(): void
     {
-        $this->reset('status', 'client', 'type', 'state', 'from', 'until', 'sort', 'perPage', 'query');
+        $this->reset('status', 'type', 'state', 'from', 'until', 'sort', 'perPage', 'query');
         session()->forget(['assignment_search.'.Auth::id(), 'assignment_filters.'.Auth::id()]);
         $this->resetPage();
     }
 
-    public function render(ClientAccess $access): View
+    public function render(): View
     {
         Gate::authorize('viewAny', AssignmentBatch::class);
-        $batches = $access->scope(AssignmentBatch::query(), Auth::user())->with(['client', 'type', 'state']);
+        $batches = AssignmentBatch::query()->with(['type', 'state']);
         in_array($this->status, ['active', 'archived'], true) ? $batches->where('status', $this->status) : $batches->whereRaw('false');
-        if ($this->client !== '') {
-            ctype_digit($this->client) && strlen($this->client) < 19 ? $batches->where('client_id', $this->client) : $batches->whereRaw('false');
-        }
         $batches->when($this->type !== '', fn ($q) => $q->where('type_code', $this->type))->when($this->state !== '', fn ($q) => $q->where('state_code', $this->state));
         $dates = Validator::make(['from' => $this->from ?: null, 'until' => $this->until ?: null], ['from' => ['nullable', 'date_format:Y-m-d'], 'until' => ['nullable', 'date_format:Y-m-d', ...($this->from !== '' ? ['after_or_equal:from'] : [])]]);
         if ($dates->fails()) {
@@ -103,7 +96,7 @@ class Index extends Component
         $size = in_array($this->perPage, ['25', '50', '100'], true) ? (int) $this->perPage : 25;
 
         return view('livewire.admin.assignments.index', [
-            'batches' => $batches->paginate($size), 'clients' => $access->clients(Auth::user())->orderBy('name')->get(),
+            'batches' => $batches->paginate($size),
             'types' => ReferenceValue::query()->where('category', 'assignment_type')->orderBy('sort_order')->get(),
             'states' => ReferenceValue::query()->where('category', 'state')->orderBy('label')->get(),
             'filterError' => $dates->fails() ? $dates->errors()->first() : null,

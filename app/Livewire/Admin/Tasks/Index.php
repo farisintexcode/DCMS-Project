@@ -6,7 +6,6 @@ use App\Models\AssignmentBatch;
 use App\Models\CustomerCategory;
 use App\Models\Staff;
 use App\Models\Task;
-use App\Services\ClientAccess;
 use App\Services\Tasks\TaskAccess;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -29,9 +28,6 @@ class Index extends Component
 
     #[Url]
     public string $batch = '';
-
-    #[Url]
-    public string $client = '';
 
     #[Url]
     public string $rider = '';
@@ -78,10 +74,10 @@ class Index extends Component
         $this->redirectRoute('admin.tasks.allocate');
     }
 
-    public function render(TaskAccess $access, ClientAccess $clients): View
+    public function render(TaskAccess $access): View
     {
         Gate::authorize('viewAny', Task::class);
-        $scope = $access->scope(Task::query(), Auth::user());
+        $scope = Task::query();
         $tasks = clone $scope;
         match ($this->status) {
             'all' => null,
@@ -97,9 +93,6 @@ class Index extends Component
         };
         if ($this->batch !== '') {
             $tasks->whereHas('batch', fn ($q) => $q->where('public_id', $this->validUuid($this->batch)));
-        }
-        if ($this->client !== '') {
-            $tasks->whereHas('batch.client', fn ($q) => $q->where('public_id', $this->validUuid($this->client)));
         }
         if ($this->customer !== '') {
             $tasks->whereHas('customer', fn ($q) => $q->where('public_id', $this->validUuid($this->customer)));
@@ -122,7 +115,7 @@ class Index extends Component
             $tasks->when($this->from !== '', fn ($q) => $q->where('tasks.created_at', '>=', Carbon::parse($this->from, config('dcms.business_timezone'))->utc()))->when($this->until !== '', fn ($q) => $q->where('tasks.created_at', '<', Carbon::parse($this->until, config('dcms.business_timezone'))->addDay()->utc()));
         }
 
-        return view('livewire.admin.tasks.index', ['tasks' => $tasks->with(['batch.client', 'account', 'customer', 'currentAllocation.collector'])->withMax('history', 'occurred_at')->latest('id')->paginate(25), 'clients' => $clients->clients(Auth::user())->get(), 'batches' => $clients->scope(AssignmentBatch::query(), Auth::user())->latest('id')->limit(200)->get(), 'riders' => Staff::query()->whereHas('user', fn ($q) => $q->whereHas('clientScopes', fn ($q) => $q->whereIn('client_id', $clients->clients(Auth::user())->select('id'))))->orderBy('first_name')->limit(200)->get(), 'categories' => $clients->scope(CustomerCategory::query(), Auth::user())->where('is_active', true)->get(), 'metrics' => ['active' => (clone $scope)->whereNotIn('work_status', ['completed', 'cancelled'])->count(), 'unassigned' => (clone $scope)->whereDoesntHave('currentAllocation')->whereNotIn('work_status', ['completed', 'cancelled'])->count(), 'assigned' => (clone $scope)->whereHas('currentAllocation')->whereNotIn('work_status', ['completed', 'cancelled'])->count(), 'pending' => (clone $scope)->where('work_status', 'submitted')->where('review_status', 'pending')->count()]]);
+        return view('livewire.admin.tasks.index', ['tasks' => $tasks->with(['batch', 'account', 'customer', 'currentAllocation.collector'])->withMax('history', 'occurred_at')->latest('id')->paginate(25), 'batches' => AssignmentBatch::query()->latest('id')->limit(200)->get(), 'riders' => Staff::query()->where('is_rider', true)->orderBy('first_name')->limit(200)->get(), 'categories' => CustomerCategory::query()->where('is_active', true)->get(), 'metrics' => ['active' => (clone $scope)->whereNotIn('work_status', ['completed', 'cancelled'])->count(), 'unassigned' => (clone $scope)->whereDoesntHave('currentAllocation')->whereNotIn('work_status', ['completed', 'cancelled'])->count(), 'assigned' => (clone $scope)->whereHas('currentAllocation')->whereNotIn('work_status', ['completed', 'cancelled'])->count(), 'pending' => (clone $scope)->where('work_status', 'submitted')->where('review_status', 'pending')->count()]]);
     }
 
     private function validUuid(string $value): string

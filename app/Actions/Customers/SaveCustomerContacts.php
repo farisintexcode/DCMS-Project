@@ -2,7 +2,6 @@
 
 namespace App\Actions\Customers;
 
-use App\Models\Client;
 use App\Models\Debtor;
 use App\Models\User;
 use App\Services\AuditWriter;
@@ -20,10 +19,9 @@ class SaveCustomerContacts
     public function handle(User $actor, Debtor $target, array $items, string $revision): Debtor
     {
         return DB::transaction(function () use ($actor, $target, $items, $revision): Debtor {
-            Client::query()->lockForUpdate()->findOrFail($target->client_id);
             $actor = $actor->fresh();
-            $customer = Debtor::query()->with('client')->lockForUpdate()->findOrFail($target->id);
-            abort_unless($actor->hasClientScope($customer->client), 404);
+            $customer = Debtor::query()->lockForUpdate()->findOrFail($target->id);
+            abort_unless($actor->isActive(), 404);
             Gate::forUser($actor)->authorize('updateContacts', $customer);
             if (! hash_equals($customer->revision(), $revision)) {
                 throw ValidationException::withMessages(['revision' => 'Customer contacts changed. Reload and review before saving.']);

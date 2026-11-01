@@ -20,11 +20,6 @@ class ImportBatch extends Model
         return ['started_at' => 'immutable_datetime', 'completed_at' => 'immutable_datetime', 'mapping_confirmed_at' => 'immutable_datetime', 'confirmed_at' => 'immutable_datetime'];
     }
 
-    public function client(): BelongsTo
-    {
-        return $this->belongsTo(Client::class);
-    }
-
     public function template(): BelongsTo
     {
         return $this->belongsTo(ImportTemplate::class, 'template_id');

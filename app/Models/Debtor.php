@@ -5,7 +5,6 @@ namespace App\Models;
 use App\Models\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /** Customer is the business label; Database.md retains Debtor/debtors. */
@@ -20,11 +19,6 @@ class Debtor extends Model
     protected function casts(): array
     {
         return ['display_name_ciphertext' => 'encrypted', 'identity_ciphertext' => 'encrypted', 'search_tokens' => 'array'];
-    }
-
-    public function client(): BelongsTo
-    {
-        return $this->belongsTo(Client::class);
     }
 
     public function contacts(): HasMany
@@ -45,7 +39,7 @@ class Debtor extends Model
     public function revision(): string
     {
         return hash('sha256', json_encode([
-            [$this->id, $this->client_id, $this->customer_reference, $this->party_type, $this->status ?? 'active',
+            [$this->id, $this->customer_reference, $this->party_type, $this->status ?? 'active',
                 $this->getRawOriginal('display_name_ciphertext'), $this->getRawOriginal('identity_ciphertext'),
                 $this->identity_fingerprint, $this->nationality_code, $this->verification_status ?? 'unverified',
                 $this->search_tokens, $this->updated_at?->format('Y-m-d H:i:s.uP')],

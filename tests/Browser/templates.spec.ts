@@ -43,7 +43,7 @@ test('template manager previews approved defaults and reviews replacement histor
     await page.getByLabel('Account context (optional)',{exact:true}).selectOption({label:'M06-'+surface.toUpperCase()});
     await page.getByRole('button',{name:'Preview for selected customer',exact:true}).click();
     await expect(page.getByRole('heading',{name:'Personalized preview',exact:true})).toBeVisible();
-    await expect(page.getByText('Hello Synthetic Field Customer '+surface+', account M06-'+surface.toUpperCase()+', from Synthetic Client.',{exact:true})).toBeVisible();
+    await expect(page.getByText('Hello Synthetic Field Customer '+surface+', account M06-'+surface.toUpperCase()+', from '+(process.env.DCMS_COMPANY_NAME??'Nexora')+'.',{exact:true})).toBeVisible();
     if(surface==='rider-mobile'){
         for(const width of [320,430]){
             await page.setViewportSize({width,height:900});
@@ -61,7 +61,7 @@ test('template manager previews approved defaults and reviews replacement histor
     await page.getByRole('button',{name:'Create / open next draft',exact:true}).click();
     await expect(page.getByText('Version 3.0 · Draft',{exact:true})).toBeVisible();
     await page.getByLabel('Message / letter body',{exact:true}).fill('Revised message for {{customer_name}} and account {{account_number}}.');
-    await page.getByLabel('Commissioning client name',{exact:true}).uncheck();
+    await page.getByLabel('Company name',{exact:true}).uncheck();
     await page.getByRole('button',{name:'Save draft',exact:true}).click();
     await expect(page.getByRole('status').filter({hasText:'Draft saved.'})).toBeVisible();
     await page.getByRole('button',{name:'Submit for approval',exact:true}).click();

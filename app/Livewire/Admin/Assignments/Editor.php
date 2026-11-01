@@ -9,7 +9,6 @@ use App\Models\AssignmentBatch;
 use App\Models\AuditLog;
 use App\Models\ReferenceValue;
 use App\Services\Assignments\BatchWork;
-use App\Services\ClientAccess;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
@@ -30,7 +29,7 @@ class Editor extends Component
     #[Locked]
     public ?int $version = null;
 
-    public array $data = ['client_id' => '', 'name' => '', 'external_reference' => '', 'type_code' => '', 'start_date' => '', 'due_date' => '', 'description' => '', 'dca_code' => '', 'dca_name' => '', 'la_name' => '', 'state_code' => ''];
+    public array $data = ['name' => '', 'external_reference' => '', 'type_code' => '', 'start_date' => '', 'due_date' => '', 'description' => '', 'dca_code' => '', 'dca_name' => '', 'la_name' => '', 'state_code' => ''];
 
     public string $status = 'active';
 
@@ -41,14 +40,10 @@ class Editor extends Component
         if (! $batch?->exists) {
             Gate::authorize('create', AssignmentBatch::class);
             $this->data['start_date'] = now()->timezone(config('dcms.business_timezone'))->toDateString();
-            $clients = app(ClientAccess::class)->clients(Auth::user())->limit(2)->pluck('id');
-            if ($clients->count() === 1) {
-                $this->data['client_id'] = (string) $clients->first();
-            }
 
             return;
         }
-        abort_unless(Auth::user()->hasClientScope($batch->client), 404);
+        abort_unless(Auth::user()->isActive(), 404);
         Gate::authorize('view', $batch);
         request()->attributes->set('assignment_status', $batch->status->value);
         $this->batchId = $batch->id;
@@ -75,21 +70,20 @@ class Editor extends Component
         $this->redirectRoute('admin.assignments.edit', ['batch' => $batch->public_id]);
     }
 
-    public function render(ClientAccess $access, BatchWork $work): View
+    public function render(BatchWork $work): View
     {
-        $batch = $this->batchId ? AssignmentBatch::query()->with(['client', 'creator', 'type', 'state'])->findOrFail($this->batchId) : null;
+        $batch = $this->batchId ? AssignmentBatch::query()->with(['creator', 'type', 'state'])->findOrFail($this->batchId) : null;
         if ($batch) {
-            abort_unless(Auth::user()->hasClientScope($batch->client), 404);
+            abort_unless(Auth::user()->isActive(), 404);
             Gate::authorize('view', $batch);
         } else {
             Gate::authorize('create', AssignmentBatch::class);
         }
         $references = fn (string $category, ?string $current) => ReferenceValue::query()->where('category', $category)->where(fn ($q) => $q->where('is_active', true)->when($current, fn ($q) => $q->orWhere('code', $current)))->orderBy('label')->get();
         $typeOrder = array_flip(self::TYPE_ORDER);
-        $clients = $access->clients(Auth::user())->orderBy('name')->get();
 
         return view('livewire.admin.assignments.editor', [
-            'batch' => $batch, 'clients' => $clients, 'showClientPicker' => $batch !== null || $clients->count() > 1,
+            'batch' => $batch,
             'today' => now()->timezone(config('dcms.business_timezone'))->toDateString(),
             'types' => $references('assignment_type', $batch?->type_code)->sortBy(fn (ReferenceValue $type): int => $typeOrder[$type->code] ?? count($typeOrder))->values(),
             'states' => $references('state', $batch?->state_code),

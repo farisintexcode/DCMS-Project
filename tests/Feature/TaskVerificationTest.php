@@ -12,7 +12,6 @@ use App\Models\TaskAllocation;
 use App\Models\TaskReview;
 use App\Models\TaskSubmission;
 use App\Models\User;
-use App\Models\UserClientScope;
 use App\Services\Reports\TaskReports;
 use App\Services\Tasks\CompletionChecklist;
 use Database\Seeders\DatabaseSeeder;
@@ -38,10 +37,6 @@ function reviewFixture(?User $reviewer = null): array
     $rider->assignRole('Rider');
     $reviewer ??= User::factory()->create();
     $reviewer->assignRole('Admin');
-    foreach ([$rider, $reviewer] as $user) {
-        $scope = new UserClientScope;
-        $scope->forceFill(['user_id' => $user->id, 'client_id' => $task->batch->client_id, 'granted_by' => $reviewer->id, 'reason' => 'Synthetic review portfolio', 'valid_from' => now()->subMinute()])->save();
-    }
     TaskAllocation::factory()->create(['task_id' => $task->id, 'collector_id' => $rider->staff_id, 'assigned_by' => $reviewer->id]);
     app(RiderWork::class)->start($rider, $task, 0);
     $visit = app(RiderWork::class)->visit($rider, $task, $task->refresh()->lock_version, [
@@ -59,17 +54,12 @@ function verificationPreview(User $reviewer, TaskSubmission $submission, string 
     return app(ReviewSubmission::class)->prepare($reviewer, [$submission->public_id], $decision, $reason);
 }
 
-test('verification routes require reviewer permission and hide cross-client submissions', function (): void {
+test('verification routes require reviewer permission', function (): void {
     [$reviewer,$rider,$task,$submission] = reviewFixture();
     $this->get(route('admin.verification.index'))->assertRedirect(route('login'));
     $this->actingAs($rider)->get(route('admin.verification.index'))->assertForbidden();
     $this->actingAs($reviewer)->get(route('admin.verification.index'))->assertOk()->assertSee('Task verification');
     $this->get(route('admin.verification.show', $submission))->assertOk()->assertSee('Synthetic submitted visit');
-    [$foreign] = reviewFixture();
-    $this->actingAs($foreign)->get(route('admin.verification.show', $submission))->assertNotFound();
-    $preview = verificationPreview($foreign, $submission);
-    expect($preview['rows'][0]['customer'])->toBe('Unavailable');
-    expect(fn () => app(ReviewSubmission::class)->confirm($foreign, $preview))->toThrow(ValidationException::class);
 });
 
 test('independent approval completes exact submitted version and persists immutable decision audit history and notice', function (): void {
@@ -137,13 +127,13 @@ test('fresh bulk preview commits each explicit row once with exact reconciliatio
     expect(collect($result)->where('status', 'applied')->count())->toBe(2)->and(TaskReview::query()->count())->toBe(2)->and($one->refresh()->review_status)->toBe('returned')->and($two->refresh()->review_status)->toBe('returned');
 });
 
-test('permission scope and signature changes invalidate a pending preview without decisions', function (): void {
+test('permission and signature changes invalidate a pending preview without decisions', function (): void {
     [$reviewer,$rider,$task,$submission] = reviewFixture();
     $preview = verificationPreview($reviewer, $submission);
     $forged = $preview;
     $forged['reason'] = 'Changed after preview';
     expect(fn () => app(ReviewSubmission::class)->confirm($reviewer, $forged))->toThrow(ValidationException::class);
-    $reviewer->clientScopes()->update(['valid_to' => now()->format('Y-m-d H:i:s.uP')]);
+    $reviewer->syncRoles([]);
     expect(fn () => app(ReviewSubmission::class)->confirm($reviewer, $preview))->toThrow(ValidationException::class);
     expect(TaskReview::query()->count())->toBe(0);
 });
@@ -156,8 +146,6 @@ test('review uses frozen policy instead of later master data and rejects drafts 
     $first = verificationPreview($reviewer, $submission);
     $competitor = User::factory()->create();
     $competitor->assignRole('Admin');
-    $scope = new UserClientScope;
-    $scope->forceFill(['user_id' => $competitor->id, 'client_id' => $task->batch->client_id, 'granted_by' => $reviewer->id, 'reason' => 'Synthetic second reviewer', 'valid_from' => now()->subMinute()])->save();
     app(ReviewSubmission::class)->confirm($competitor, verificationPreview($competitor, $submission));
     expect(fn () => app(ReviewSubmission::class)->confirm($reviewer, $first))->toThrow(ValidationException::class);
     expect(TaskReview::query()->count())->toBe(1);

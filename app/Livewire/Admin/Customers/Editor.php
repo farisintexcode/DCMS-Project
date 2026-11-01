@@ -6,7 +6,6 @@ use App\Actions\Customers\SaveCustomer;
 use App\Models\CustomerCategory;
 use App\Models\Debtor;
 use App\Models\ReferenceValue;
-use App\Services\ClientAccess;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
@@ -27,7 +26,7 @@ class Editor extends Component
     #[Locked]
     public ?string $revision = null;
 
-    public array $data = ['client_id' => '', 'customer_reference' => '', 'party_type' => 'person', 'name' => '', 'identity' => '', 'clear_identity' => false, 'duplicate_confirmed' => false, 'status' => 'active', 'contacts' => [], 'addresses' => [], 'category_ids' => []];
+    public array $data = ['customer_reference' => '', 'party_type' => 'person', 'name' => '', 'identity' => '', 'clear_identity' => false, 'duplicate_confirmed' => false, 'status' => 'active', 'contacts' => [], 'addresses' => [], 'category_ids' => []];
 
     public function mount(?Debtor $customer = null): void
     {
@@ -36,12 +35,12 @@ class Editor extends Component
 
             return;
         }
-        abort_unless(Auth::user()->hasClientScope($customer->client), 404);
+        abort_unless(Auth::user()->isActive(), 404);
         Gate::authorize('update', $customer);
         $this->customerId = $customer->id;
         $this->customerPublicId = $customer->public_id;
         $this->revision = $customer->revision();
-        $this->data = array_replace($this->data, ['client_id' => $customer->client_id, 'customer_reference' => $customer->customer_reference, 'party_type' => $customer->party_type, 'name' => $customer->display_name_ciphertext, 'status' => $customer->status, 'category_ids' => $customer->categoryAssignments()->whereNull('revoked_at')->pluck('category_id')->all()]);
+        $this->data = array_replace($this->data, ['customer_reference' => $customer->customer_reference, 'party_type' => $customer->party_type, 'name' => $customer->display_name_ciphertext, 'status' => $customer->status, 'category_ids' => $customer->categoryAssignments()->whereNull('revoked_at')->pluck('category_id')->all()]);
         if (Auth::user()->can('customers.update_contacts')) {
             $this->data['contacts'] = $customer->contacts()->whereNull('valid_to')->orderBy('id')->get()->map(fn ($c) => ['kind' => $c->kind_code, 'value' => $c->value_ciphertext, 'is_primary' => $c->is_primary])->all();
         }
@@ -53,13 +52,6 @@ class Editor extends Component
         abort_unless(Auth::user()->can('customers.update_contacts'), 403);
         if (count($this->data['contacts']) < 20) {
             $this->data['contacts'][] = ['kind' => 'mobile', 'value' => '', 'is_primary' => false];
-        }
-    }
-
-    public function updatedDataClientId(): void
-    {
-        if (! $this->customerId) {
-            $this->data['category_ids'] = [];
         }
     }
 
@@ -84,7 +76,7 @@ class Editor extends Component
 
     public function save(SaveCustomer $save): void
     {
-        $customer = $this->customerId ? Debtor::query()->with('client')->findOrFail($this->customerId) : null;
+        $customer = $this->customerId ? Debtor::query()->findOrFail($this->customerId) : null;
         $input = $this->data;
         if (! Auth::user()->can('customers.update_contacts')) {
             unset($input['contacts']);
@@ -105,13 +97,12 @@ class Editor extends Component
             abort_unless(Auth::user()->can('customers.create'), 403);
         }
         if ($this->customerId) {
-            $customer = Debtor::query()->with('client')->findOrFail($this->customerId);
-            abort_unless(Auth::user()->hasClientScope($customer->client), 404);
+            $customer = Debtor::query()->findOrFail($this->customerId);
+            abort_unless(Auth::user()->isActive(), 404);
             Gate::authorize('update', $customer);
         }
-        $access = app(ClientAccess::class);
-        $categories = $access->scope(CustomerCategory::query(), Auth::user())->where('client_id', (int) ($this->data['client_id'] ?? 0))->orderBy('name')->get();
+        $categories = CustomerCategory::query()->orderBy('name')->get();
 
-        return view('livewire.admin.customers.editor', ['clients' => $access->clients(Auth::user())->orderBy('name')->get(), 'categories' => $categories, 'states' => ReferenceValue::query()->where('category', 'state')->where('is_active', true)->orderBy('label')->get()]);
+        return view('livewire.admin.customers.editor', ['categories' => $categories, 'states' => ReferenceValue::query()->where('category', 'state')->where('is_active', true)->orderBy('label')->get()]);
     }
 }

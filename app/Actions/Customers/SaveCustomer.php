@@ -3,7 +3,6 @@
 namespace App\Actions\Customers;
 
 use App\Models\Address;
-use App\Models\Client;
 use App\Models\Contact;
 use App\Models\Debtor;
 use App\Models\User;
@@ -24,21 +23,16 @@ class SaveCustomer
     public function handle(User $actor, array $input, ?Debtor $existing = null, ?string $revision = null): Debtor
     {
         return DB::transaction(function () use ($actor, $input, $existing, $revision): Debtor {
-            $clientId = $existing?->client_id ?? (is_scalar($input['client_id'] ?? null) ? filter_var($input['client_id'], FILTER_VALIDATE_INT) : 0);
-            $client = Client::query()->lockForUpdate()->findOrFail($clientId ?: 0);
-            abort_unless($actor->hasClientScope($client), 404);
-            $customer = $existing ? Debtor::query()->with('client')->lockForUpdate()->findOrFail($existing->id) : new Debtor;
-            Gate::forUser($actor)->authorize($existing ? 'update' : 'create', $existing ? $customer : [Debtor::class, $client]);
+            abort_unless($actor->isActive(), 404);
+            $customer = $existing ? Debtor::query()->lockForUpdate()->findOrFail($existing->id) : new Debtor;
+            Gate::forUser($actor)->authorize($existing ? 'update' : 'create', $existing ? $customer : Debtor::class);
             if ($existing && (! $revision || ! hash_equals($customer->revision(), $revision))) {
                 throw ValidationException::withMessages(['revision' => 'This customer changed after you opened the form. Reload and review before saving.']);
-            }
-            if (isset($input['client_id']) && (int) $input['client_id'] !== $client->id) {
-                throw ValidationException::withMessages(['data.client_id' => 'The customer’s client cannot be changed.']);
             }
             $input['customer_reference'] = is_string($input['customer_reference'] ?? '') ? trim($input['customer_reference'] ?? '') : $input['customer_reference'];
             $input['name'] = is_string($input['name'] ?? '') ? trim($input['name'] ?? '') : $input['name'];
             $rules = [
-                'customer_reference' => ['required', 'string', 'max:80', Rule::unique('debtors')->where('client_id', $client->id)->ignore($customer->id)],
+                'customer_reference' => ['required', 'string', 'max:80', Rule::unique('debtors')->ignore($customer->id)],
                 'party_type' => ['required', Rule::in(['person', 'company'])],
                 'name' => ['required', 'string', 'max:200'],
                 'identity' => ['nullable', 'string', 'max:100', 'regex:/^[\p{L}\p{N}\s.\/-]+$/u'],
@@ -70,8 +64,6 @@ class SaveCustomer
                 $this->contacts->validate($data['contacts']);
             }
             $before = $existing ? ['status' => $customer->status, 'party_type' => $customer->party_type] : [];
-            $customer->client_id = $client->id;
-            $customer->setRelation('client', $client);
             $customer->customer_reference = $data['customer_reference'];
             $customer->party_type = $data['party_type'];
             $customer->display_name_ciphertext = $data['name'];
@@ -80,9 +72,9 @@ class SaveCustomer
             $identity = trim($data['identity'] ?? '');
             if ($identity !== '') {
                 $fingerprint = $this->search->token('identity', $this->search->identity($identity));
-                $duplicate = Debtor::query()->where('client_id', $client->id)->where('identity_fingerprint', $fingerprint)->when($customer->exists, fn ($q) => $q->where('id', '!=', $customer->id))->exists();
+                $duplicate = Debtor::query()->where('identity_fingerprint', $fingerprint)->when($customer->exists, fn ($q) => $q->where('id', '!=', $customer->id))->exists();
                 if ($duplicate && ! ($data['duplicate_confirmed'] ?? false) && $customer->identity_fingerprint !== $fingerprint) {
-                    $this->invalid(['identity' => ['This identifier matches an existing customer in this client. Review the duplicate warning before keeping a separate customer.']]);
+                    $this->invalid(['identity' => ['This identifier matches an existing customer. Review the duplicate warning before keeping a separate customer.']]);
                 }
                 $customer->identity_ciphertext = $identity;
                 $customer->identity_fingerprint = $fingerprint;

@@ -7,7 +7,6 @@ use App\Models\AssignmentBatch;
 use App\Models\BulkOperation;
 use App\Models\Task;
 use App\Services\AuditWriter;
-use App\Services\ClientAccess;
 use App\Services\Tasks\TaskAccess;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -56,7 +55,7 @@ class Allocation extends Component
         if ($task) {
             $this->mode = 'single';
         }
-        $tasks = app(TaskAccess::class)->scope(Task::query(), Auth::user())->whereIn('public_id', $this->selected)->with('batch')->get();
+        $tasks = Task::query()->whereIn('public_id', $this->selected)->with('batch')->get();
         if ($tasks->count() !== count($this->selected)) {
             abort(404);
         }
@@ -70,8 +69,8 @@ class Allocation extends Component
         if (! $this->operationId) {
             return null;
         }
-        $record = BulkOperation::query()->with(['batch.client', 'collector'])->where('public_id', $this->operationId)->firstOrFail();
-        abort_unless(Auth::user()->hasClientScope($record->batch->client), 404);
+        $record = BulkOperation::query()->with(['batch', 'collector'])->where('public_id', $this->operationId)->firstOrFail();
+        abort_unless(Auth::user()->isActive(), 404);
         Gate::authorize('viewAny', Task::class);
 
         return $record;
@@ -79,7 +78,7 @@ class Allocation extends Component
 
     public function preview(TaskOperation $actions): void
     {
-        $tasks = app(TaskAccess::class)->scope(Task::query(), Auth::user())->whereIn('public_id', array_filter($this->selected, fn ($id) => is_string($id) && Str::isUuid($id)))->get();
+        $tasks = Task::query()->whereIn('public_id', array_filter($this->selected, fn ($id) => is_string($id) && Str::isUuid($id)))->get();
         if (count($this->selected) !== $tasks->count()) {
             abort(404);
         }
@@ -120,16 +119,16 @@ class Allocation extends Component
         }, 'task-operation-'.$record->public_id.'.csv', ['Content-Type' => 'text/csv', 'Cache-Control' => 'no-store']);
     }
 
-    public function render(ClientAccess $access, TaskAccess $tasks): View
+    public function render(TaskAccess $tasks): View
     {
         Gate::authorize('viewAny', Task::class);
         $record = $this->operationRecord();
         if ($record) {
             $this->digest = $record->preview_digest;
         }
-        $batches = $access->scope(AssignmentBatch::query(), Auth::user())->where('status', 'active')->with('client')->latest('id')->limit(200)->get();
+        $batches = AssignmentBatch::query()->where('status', 'active')->latest('id')->limit(200)->get();
         $batch = ctype_digit($this->batchId) ? $batches->firstWhere('id', (int) $this->batchId) : null;
 
-        return view('livewire.admin.tasks.allocation', ['record' => $record, 'batches' => $batches, 'riders' => $batch ? $tasks->riders($batch->client)->orderBy('first_name')->get() : collect(), 'items' => $record ? $record->items()->with(['task.customer', 'task.account', 'task.currentAllocation.collector'])->orderBy('id')->get() : collect(), 'selection' => $tasks->scope(Task::query(), Auth::user())->whereIn('public_id', array_filter($this->selected, fn ($id) => is_string($id) && Str::isUuid($id)))->with(['customer', 'account'])->get()]);
+        return view('livewire.admin.tasks.allocation', ['record' => $record, 'batches' => $batches, 'riders' => $batch ? $tasks->riders()->orderBy('first_name')->get() : collect(), 'items' => $record ? $record->items()->with(['task.customer', 'task.account', 'task.currentAllocation.collector'])->orderBy('id')->get() : collect(), 'selection' => Task::query()->whereIn('public_id', array_filter($this->selected, fn ($id) => is_string($id) && Str::isUuid($id)))->with(['customer', 'account'])->get()]);
     }
 }

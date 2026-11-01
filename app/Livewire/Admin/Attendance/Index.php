@@ -5,9 +5,7 @@ namespace App\Livewire\Admin\Attendance;
 use App\Models\Attendance;
 use App\Services\Attendance\AttendanceAccess;
 use App\Services\Attendance\AttendanceRegister;
-use App\Services\ClientAccess;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Attributes\Layout;
@@ -33,9 +31,6 @@ class Index extends Component
     #[Url]
     public string $rider = '';
 
-    #[Url]
-    public string $client = '';
-
     public string $search = '';
 
     public function mount(): void
@@ -52,7 +47,7 @@ class Index extends Component
 
     public function filters(): array
     {
-        return $this->only(['from', 'until', 'status', 'rider', 'client', 'search']);
+        return $this->only(['from', 'until', 'status', 'rider', 'search']);
     }
 
     public function selectStatus(string $status): void
@@ -61,7 +56,7 @@ class Index extends Component
         $this->resetPage();
     }
 
-    public function render(AttendanceRegister $register, AttendanceAccess $access, ClientAccess $clients): View
+    public function render(AttendanceRegister $register, AttendanceAccess $access): View
     {
         Gate::authorize('viewAny', Attendance::class);
         $asOf = now()->toImmutable();
@@ -76,6 +71,6 @@ class Index extends Component
         $totals = (clone $query)->selectRaw('result_status, count(*) as total')->groupBy('result_status')->pluck('total', 'result_status')->all();
         $rows = $query->orderByDesc('service_date')->orderBy('staff_no')->orderBy('rider_public_id')->paginate(25);
 
-        return view('livewire.admin.attendance.index', ['rows' => $rows, 'totals' => $totals, 'filterError' => $error, 'asOf' => $asOf, 'riders' => $access->riders(auth()->user(), Str::isUuid($this->client) ? $this->client : null)->orderBy('staff_no')->limit(200)->get(), 'clients' => $clients->clients(auth()->user())->orderBy('name')->get()]);
+        return view('livewire.admin.attendance.index', ['rows' => $rows, 'totals' => $totals, 'filterError' => $error, 'asOf' => $asOf, 'riders' => $access->riders(auth()->user())->orderBy('staff_no')->limit(200)->get()]);
     }
 }

@@ -30,7 +30,7 @@ PostgreSQL local-session timezone and whole-second bindings initially made newly
 
 Membership/client and observation-history integrity is enforced by PostgreSQL triggers as well as application validation. Trigger functions use CREATE OR REPLACE so an isolated test database can be rebuilt safely; migrations remove them on rollback.
 
-Until client/scope administration is implemented, dcms:provision-local-client explicitly provisions a new commissioning client and scope for an active scopes.manage account in local environments only. Normal seeders do not create customers, clients, accounts or passwords. Browser fixtures remain synthetic and restricted to isolated local/test databases ending _e2e.
+Normal seeders do not create customers, accounts or passwords. Browser fixtures remain synthetic and restricted to isolated local/test databases ending _e2e.
 
 ## Verification
 

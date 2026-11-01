@@ -32,7 +32,7 @@ return [
         'communication-permission.create', 'communication-permission.update', 'communication-permission.block', 'communication-permission.approve', 'communication-permission.override', 'calls.record', 'communications.view', 'communications.compose', 'communications.send',
         'communications.bulk_send', 'communications.generate_letter', 'templates.manage', 'templates.approve',
         'whatsapp.message', 'whatsapp.call', 'reports.view', 'reports.export',
-        'roles.manage', 'scopes.manage', 'audit.view', 'integrations.manage', 'monitoring.view',
+        'roles.manage', 'audit.view', 'integrations.manage', 'monitoring.view',
     ],
     'rider_permissions' => ['rider.access', 'tasks.view', 'tasks.submit', 'attendance.clock', 'attendance.view_own'],
     'rider_only_permissions' => ['rider.access', 'tasks.submit', 'attendance.clock', 'attendance.view_own'],

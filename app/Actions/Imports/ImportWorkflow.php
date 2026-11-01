@@ -4,7 +4,6 @@ namespace App\Actions\Imports;
 
 use App\Enums\BatchStatus;
 use App\Models\AssignmentBatch;
-use App\Models\Client;
 use App\Models\ColumnAlias;
 use App\Models\Document;
 use App\Models\ImportBatch;
@@ -38,13 +37,12 @@ class ImportWorkflow
 
     public function upload(User $actor, array $input, UploadedFile $file): ImportBatch
     {
-        Validator::make($input, ['client_id' => ['required', 'integer'], 'kind' => ['required', Rule::in(['customer', 'assignment_batch'])], 'template_id' => ['required', 'integer'], 'assignment_batch_id' => ['nullable', 'integer']])->validate();
+        Validator::make($input, ['kind' => ['required', Rule::in(['customer', 'assignment_batch'])], 'template_id' => ['required', 'integer'], 'assignment_batch_id' => ['nullable', 'integer']])->validate();
         Validator::make(['file' => $file], ['file' => ['required', 'file', 'extensions:xlsx,xls', 'max:'.config('imports.max_kilobytes')]])->validate();
-        $client = Client::query()->findOrFail($input['client_id']);
-        Gate::forUser($actor)->authorize('create', [ImportBatch::class, $client]);
+        Gate::forUser($actor)->authorize('create', ImportBatch::class);
         $template = ImportTemplate::query()->where('is_active', true)->where('kind', $input['kind'])->findOrFail($input['template_id']);
         $hash = hash_file('sha256', $file->getRealPath());
-        $key = hash('sha256', implode('|', [$client->id, $input['kind'], $template->id, $input['assignment_batch_id'] ?? '', $hash]));
+        $key = hash('sha256', implode('|', [$input['kind'], $template->id, $input['assignment_batch_id'] ?? '', $hash]));
         $bucket = config('filesystems.disks.s3.bucket');
         if (! is_string($bucket) || $bucket === '') {
             throw ValidationException::withMessages(['file' => 'Configure private S3 storage before uploading workbooks.']);
@@ -52,9 +50,8 @@ class ImportWorkflow
         $object = 'imports/quarantine/'.Str::uuid7().'.encrypted';
         $stored = false;
         try {
-            return DB::transaction(function () use ($actor, $input, $file, $client, $template, $hash, $key, $bucket, $object, &$stored): ImportBatch {
-                Client::query()->lockForUpdate()->findOrFail($client->id);
-                Gate::forUser($actor->fresh())->authorize('create', [ImportBatch::class, $client]);
+            return DB::transaction(function () use ($actor, $input, $file, $template, $hash, $key, $bucket, $object, &$stored): ImportBatch {
+                Gate::forUser($actor->fresh())->authorize('create', ImportBatch::class);
                 while ($existing = ImportBatch::query()->where('idempotency_key', $key)->first()) {
                     if ($existing->status !== 'failed' || ! $existing->confirmed_at) {
                         return $existing;
@@ -64,10 +61,10 @@ class ImportWorkflow
                 }
                 if ($input['assignment_batch_id'] ?? null) {
                     $parent = AssignmentBatch::query()->lockForUpdate()->findOrFail($input['assignment_batch_id']);
-                    abort_unless($parent->client_id === $client->id && $parent->status === BatchStatus::Active, 422);
+                    abort_unless($parent->status === BatchStatus::Active, 422);
                 }
                 $batch = new ImportBatch;
-                $batch->forceFill(['client_id' => $client->id, 'kind' => $input['kind'], 'template_id' => $template->id, 'assignment_batch_id' => $input['assignment_batch_id'] ?? null, 'uploaded_by' => $actor->id, 'content_sha256' => $hash, 'idempotency_key' => $key, 'status' => 'uploaded'])->save();
+                $batch->forceFill(['kind' => $input['kind'], 'template_id' => $template->id, 'assignment_batch_id' => $input['assignment_batch_id'] ?? null, 'uploaded_by' => $actor->id, 'content_sha256' => $hash, 'idempotency_key' => $key, 'status' => 'uploaded'])->save();
                 if (! Storage::disk('s3')->put($object, Crypt::encryptString(file_get_contents($file->getRealPath())), ['visibility' => 'private'])) {
                     throw new RuntimeException('private_storage_failed');
                 }
@@ -168,7 +165,7 @@ class ImportWorkflow
         $this->locked($original->id, function (ImportBatch $batch) use ($actor, $sheet, $header, $profileId): void {
             Gate::forUser($actor->fresh())->authorize('map', $batch);
             $this->editable($batch);
-            $profile = $profileId ? ImportMappingProfile::query()->where('client_id', $batch->client_id)->where('template_id', $batch->template_id)->where('is_active', true)->findOrFail($profileId) : null;
+            $profile = $profileId ? ImportMappingProfile::query()->where('template_id', $batch->template_id)->where('is_active', true)->findOrFail($profileId) : null;
             $rows = $this->source($batch, fn (string $path) => $this->reader->read($path, $sheet, $header));
             $fields = ImportField::query()->whereIn('id', $batch->template->schema_definition['field_ids'])->where('is_active', true)->get();
             $batch->mappings()->delete();
@@ -181,7 +178,7 @@ class ImportWorkflow
                 }
                 $normalized = self::normalize($label);
                 $canonical = $fields->filter(fn ($field) => self::normalize($field->canonical_field) === $normalized);
-                $aliases = ColumnAlias::query()->where('module', $batch->kind)->where('is_active', true)->where('normalized_alias', $normalized)->whereIn('field_id', $fields->pluck('id'))->where(fn ($q) => $q->whereNull('client_id')->orWhere('client_id', $batch->client_id))->get();
+                $aliases = ColumnAlias::query()->where('module', $batch->kind)->where('is_active', true)->where('normalized_alias', $normalized)->whereIn('field_id', $fields->pluck('id'))->get();
                 $ids = $canonical->pluck('id')->merge($aliases->pluck('field_id'))->unique();
                 $match = $ids->count() === 1 ? $ids->first() : null;
                 $method = $match ? ($canonical->contains('id', $match) ? 'canonical' : 'alias') : 'unmatched';
@@ -201,7 +198,7 @@ class ImportWorkflow
                     $proposed[] = $match;
                 }
                 $mapping = new ImportColumnMapping;
-                $mapping->forceFill(['import_batch_id' => $batch->id, 'source_sheet' => $sheet, 'source_column_index' => $ordinal, 'original_header' => $label, 'normalized_header' => $normalized, 'field_id' => $match, 'alias_id' => $alias?->id, 'match_method' => $method, 'confidence' => $match ? 1 : null, 'transform_code' => $profileRule && $method === 'profile' ? $profileRule['transform'] : 'exact', 'is_ignored' => $method === 'profile' && $profileRule['ignore'], 'matched_rule_snapshot' => ['ambiguous' => $ids->count() > 1, 'alias' => $alias?->only(['id', 'field_id', 'normalized_alias', 'client_id'])]])->save();
+                $mapping->forceFill(['import_batch_id' => $batch->id, 'source_sheet' => $sheet, 'source_column_index' => $ordinal, 'original_header' => $label, 'normalized_header' => $normalized, 'field_id' => $match, 'alias_id' => $alias?->id, 'match_method' => $method, 'confidence' => $match ? 1 : null, 'transform_code' => $profileRule && $method === 'profile' ? $profileRule['transform'] : 'exact', 'is_ignored' => $method === 'profile' && $profileRule['ignore'], 'matched_rule_snapshot' => ['ambiguous' => $ids->count() > 1, 'alias' => $alias?->only(['id', 'field_id', 'normalized_alias'])]])->save();
             }
             unset($rows[$header]);
             foreach ($rows as $number => $values) {
@@ -314,9 +311,9 @@ class ImportWorkflow
             foreach ($batch->mappings()->get() as $mapping) {
                 $definitions[$mapping->source_column_index] = ['header' => $mapping->normalized_header, 'field_id' => $mapping->field_id, 'ignore' => $mapping->is_ignored, 'transform' => $mapping->transform_code];
             }
-            $version = (int) ImportMappingProfile::query()->where('client_id', $batch->client_id)->where('code', $code)->max('version') + 1;
+            $version = (int) ImportMappingProfile::query()->where('code', $code)->max('version') + 1;
             $profile = new ImportMappingProfile;
-            $profile->forceFill(['client_id' => $batch->client_id, 'template_id' => $batch->template_id, 'code' => $code, 'version' => $version, 'name' => $name, 'mapping_definition' => $definitions, 'created_by' => $actor->id])->save();
+            $profile->forceFill(['template_id' => $batch->template_id, 'code' => $code, 'version' => $version, 'name' => $name, 'mapping_definition' => $definitions, 'created_by' => $actor->id])->save();
             $this->audit->record($actor, 'import_profile_version_created', $profile->public_id, ['status' => 'active'], module: 'M04', entityType: 'import_profile');
 
             return $profile;
@@ -483,7 +480,6 @@ class ImportWorkflow
     {
         return DB::transaction(function () use ($id, $callback, $allowArchived): mixed {
             $original = ImportBatch::query()->findOrFail($id);
-            Client::query()->lockForUpdate()->findOrFail($original->client_id);
             if ($original->assignment_batch_id) {
                 $parent = AssignmentBatch::query()->lockForUpdate()->findOrFail($original->assignment_batch_id);
                 if ($parent->status !== BatchStatus::Active && ! $allowArchived) {
@@ -491,7 +487,7 @@ class ImportWorkflow
                 }
             }
 
-            return $callback(ImportBatch::query()->with(['client', 'template', 'source'])->lockForUpdate()->findOrFail($id));
+            return $callback(ImportBatch::query()->with(['template', 'source'])->lockForUpdate()->findOrFail($id));
         }, 3);
     }
 

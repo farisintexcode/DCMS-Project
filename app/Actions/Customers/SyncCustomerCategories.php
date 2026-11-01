@@ -10,7 +10,7 @@ use App\Services\AuditWriter;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
-/** Called inside a transaction with the client and customer locked. M13/UI61. */
+/** Called inside a transaction with the customer locked. M13/UI61. */
 class SyncCustomerCategories
 {
     public function __construct(private AuditWriter $audit) {}
@@ -21,8 +21,8 @@ class SyncCustomerCategories
         $ids = array_values(array_unique(array_map('intval', $ids)));
         $current = $customer->categoryAssignments()->whereNull('revoked_at')->pluck('category_id')->all();
         $categories = CustomerCategory::query()->whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get();
-        if ($categories->count() !== count($ids) || $categories->contains(fn ($c) => $c->client_id !== $customer->client_id || (! $c->is_active && ! in_array($c->id, $current)))) {
-            throw ValidationException::withMessages(['data.category_ids' => 'Choose active categories from this customer’s client. Existing inactive memberships may be retained.']);
+        if ($categories->count() !== count($ids) || $categories->contains(fn ($c) => (! $c->is_active && ! in_array($c->id, $current)))) {
+            throw ValidationException::withMessages(['data.category_ids' => 'Choose active categories. Existing inactive memberships may be retained.']);
         }
         $now = now();
         $instant = $now->format('Y-m-d H:i:s.uP');

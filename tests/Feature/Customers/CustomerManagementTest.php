@@ -2,8 +2,10 @@
 
 use App\Actions\Customers\SaveCategory;
 use App\Actions\Customers\SaveCustomer;
+use App\Livewire\Admin\Assignments\Editor as AssignmentEditor;
 use App\Livewire\Admin\Customers\Categories;
 use App\Livewire\Admin\Customers\Editor;
+use App\Livewire\Admin\Customers\Index;
 use App\Livewire\Admin\Customers\Show;
 use App\Models\AuditLog;
 use App\Models\CustomerCategory;
@@ -21,16 +23,23 @@ beforeEach(function (): void {
     $this->seed(DatabaseSeeder::class);
 });
 
-test('new default-time client grant is effective immediately', function (): void {
-    [$user, $client] = customerOperator();
+test('customer pages open without choosing any portfolio first', function (string $component): void {
+    Livewire::actingAs(staffManager())->test($component)->assertOk()->assertDontSee('Commissioning client');
+})->with([
+    'customers' => [Index::class],
+    'customer editor' => [Editor::class],
+    'categories' => [Categories::class],
+    'assignments' => [AssignmentEditor::class],
+]);
 
-    expect($user->hasClientScope($client))->toBeTrue();
+test('customer addresses without a valid reference are not found', function (): void {
+    $this->actingAs(staffManager())->get('/admin/customers/not-a-uuid')->assertNotFound();
 });
 
 test('customer creation persists encrypted identity contacts address and memberships atomically', function (): void {
-    [$user, $client] = customerOperator();
-    $category = CustomerCategory::factory()->for($client)->create();
-    $input = customerInput($client, ['identity' => '001122-33-4455', 'contacts' => [['kind' => 'email', 'value' => 'nur@example.test', 'is_primary' => true]], 'addresses' => [['kind' => 'billing', 'recipient' => 'Nur', 'lines' => "10 Synthetic Road\nTest Town", 'postcode' => '00100', 'state_code' => 'selangor']], 'category_ids' => [$category->id]]);
+    $user = staffManager();
+    $category = CustomerCategory::factory()->create();
+    $input = customerInput(['identity' => '001122-33-4455', 'contacts' => [['kind' => 'email', 'value' => 'nur@example.test', 'is_primary' => true]], 'addresses' => [['kind' => 'billing', 'recipient' => 'Nur', 'lines' => "10 Synthetic Road\nTest Town", 'postcode' => '00100', 'state_code' => 'selangor']], 'category_ids' => [$category->id]]);
 
     Livewire::actingAs($user)->test(Editor::class)->set('data', $input)->call('save')->assertHasNoErrors()->assertRedirect();
 
@@ -48,9 +57,9 @@ test('customer creation persists encrypted identity contacts address and members
 });
 
 test('updates supersede contacts and addresses while preserving provenance', function (): void {
-    [$user, $client] = customerOperator();
+    $user = staffManager();
     $save = app(SaveCustomer::class);
-    $input = customerInput($client, ['identity' => '0123456789', 'contacts' => [['kind' => 'mobile', 'value' => '0123456789', 'is_primary' => true]], 'addresses' => [['kind' => 'billing', 'lines' => 'Original synthetic address']]]);
+    $input = customerInput(['identity' => '0123456789', 'contacts' => [['kind' => 'mobile', 'value' => '0123456789', 'is_primary' => true]], 'addresses' => [['kind' => 'billing', 'lines' => 'Original synthetic address']]]);
     $customer = $save->handle($user, $input);
     $oldContact = $customer->contacts()->first();
     $oldAddress = $customer->addresses()->first();
@@ -70,24 +79,24 @@ test('updates supersede contacts and addresses while preserving provenance', fun
 });
 
 test('stale edits preserve the latest customer and do not add an audit event', function (): void {
-    [$user, $client] = customerOperator();
+    $user = staffManager();
     $save = app(SaveCustomer::class);
-    $customer = $save->handle($user, customerInput($client));
+    $customer = $save->handle($user, customerInput());
     $revision = $customer->revision();
-    $save->handle($user, customerInput($client, ['name' => 'Latest name']), $customer, $revision);
+    $save->handle($user, customerInput(['name' => 'Latest name']), $customer, $revision);
     $audits = AuditLog::query()->count();
 
-    expect(fn () => $save->handle($user, customerInput($client, ['name' => 'Stale name']), $customer, $revision))->toThrow(ValidationException::class);
+    expect(fn () => $save->handle($user, customerInput(['name' => 'Stale name']), $customer, $revision))->toThrow(ValidationException::class);
 
     expect($customer->fresh()->display_name_ciphertext)->toBe('Latest name');
     expect(AuditLog::query()->count())->toBe($audits);
 });
 
 test('duplicate identity requires review and never merges customers', function (): void {
-    [$user, $client] = customerOperator();
+    $user = staffManager();
     $save = app(SaveCustomer::class);
-    $save->handle($user, customerInput($client, ['identity' => 'A-001234']));
-    $input = customerInput($client, ['customer_reference' => 'C-002', 'identity' => 'A001234']);
+    $save->handle($user, customerInput(['identity' => 'A-001234']));
+    $input = customerInput(['customer_reference' => 'C-002', 'identity' => 'A001234']);
 
     expect(fn () => $save->handle($user, $input))->toThrow(ValidationException::class);
     expect(Debtor::query()->count())->toBe(1);
@@ -99,9 +108,9 @@ test('duplicate identity requires review and never merges customers', function (
 
 test('invalid customer data is reported without partial writes', function (array $changes, string $field): void {
     $audits = AuditLog::query()->count();
-    [$user, $client] = customerOperator();
+    $user = staffManager();
 
-    Livewire::actingAs($user)->test(Editor::class)->set('data', customerInput($client, $changes))->call('save')->assertHasErrors('data.'.$field);
+    Livewire::actingAs($user)->test(Editor::class)->set('data', customerInput($changes))->call('save')->assertHasErrors('data.'.$field);
 
     $this->assertDatabaseCount('debtors', 0);
     $this->assertDatabaseCount('contacts', 0);
@@ -113,20 +122,20 @@ test('invalid customer data is reported without partial writes', function (array
     [['addresses' => [['kind' => 'billing', 'lines' => 'Address', 'state_code' => 'unknown']]], 'addresses.0.state_code'],
 ]);
 
-test('unscoped records return not found and riders cannot enter customer management', function (): void {
-    [$user] = customerOperator();
-    $other = Debtor::factory()->create();
+test('customer managers reach every customer and riders cannot enter customer management', function (): void {
+    $user = staffManager();
+    $customer = Debtor::factory()->create();
     $rider = User::factory()->create();
     $rider->assignRole('Rider');
 
-    $this->actingAs($user)->get(route('admin.customers.show', $other))->assertNotFound();
-    $this->get(route('admin.customers.edit', $other))->assertNotFound();
+    $this->actingAs($user)->get(route('admin.customers.show', $customer))->assertOk();
+    $this->get(route('admin.customers.edit', $customer))->assertOk();
     $this->actingAs($rider)->get(route('admin.customers.index'))->assertForbidden();
 });
 
 test('identifier masking and escaped customer names apply on details and edit', function (): void {
-    [$user, $client] = customerOperator();
-    $customer = app(SaveCustomer::class)->handle($user, customerInput($client, ['name' => '<script>Unsafe</script>', 'identity' => '001122334455']));
+    $user = staffManager();
+    $customer = app(SaveCustomer::class)->handle($user, customerInput(['name' => '<script>Unsafe</script>', 'identity' => '001122334455']));
 
     $this->actingAs($user)->get(route('admin.customers.show', $customer))->assertOk()->assertSee('&lt;script&gt;', false)->assertDontSee('<script>Unsafe</script>', false)->assertDontSee('001122334455')->assertSee('4455');
     Livewire::actingAs($user)->test(Editor::class, ['customer' => $customer])->assertSet('data.identity', '');
@@ -135,23 +144,23 @@ test('identifier masking and escaped customer names apply on details and edit', 
 });
 
 test('category deactivation preserves existing membership and blocks new membership', function (): void {
-    [$user, $client] = customerOperator();
-    $category = CustomerCategory::factory()->for($client)->create();
+    $user = staffManager();
+    $category = CustomerCategory::factory()->create();
     $save = app(SaveCustomer::class);
-    $customer = $save->handle($user, customerInput($client, ['category_ids' => [$category->id]]));
+    $customer = $save->handle($user, customerInput(['category_ids' => [$category->id]]));
     app(SaveCategory::class)->handle($user, ['code' => $category->code, 'name' => $category->name, 'is_active' => false], $category, $category->revision());
 
-    $save->handle($user, customerInput($client, ['category_ids' => [$category->id]]), $customer, $customer->revision());
-    expect(fn () => $save->handle($user, customerInput($client, ['customer_reference' => 'C-002', 'category_ids' => [$category->id]])))->toThrow(ValidationException::class);
+    $save->handle($user, customerInput(['category_ids' => [$category->id]]), $customer, $customer->revision());
+    expect(fn () => $save->handle($user, customerInput(['customer_reference' => 'C-002', 'category_ids' => [$category->id]])))->toThrow(ValidationException::class);
 
     expect(Debtor::query()->count())->toBe(1);
     $this->assertDatabaseCount('customer_category_assignments', 1);
 });
 
 test('category removal and reassignment append history', function (): void {
-    [$user, $client] = customerOperator();
-    $category = CustomerCategory::factory()->for($client)->create();
-    $customer = app(SaveCustomer::class)->handle($user, customerInput($client, ['category_ids' => [$category->id]]));
+    $user = staffManager();
+    $category = CustomerCategory::factory()->create();
+    $customer = app(SaveCustomer::class)->handle($user, customerInput(['category_ids' => [$category->id]]));
 
     Livewire::actingAs($user)->test(Show::class, ['customer' => $customer])->set('categoryIds', [])->call('saveCategories')->assertHasNoErrors();
     Livewire::actingAs($user)->test(Show::class, ['customer' => $customer->fresh()])->set('categoryIds', [$category->id])->call('saveCategories')->assertHasNoErrors();
@@ -161,9 +170,9 @@ test('category removal and reassignment append history', function (): void {
 });
 
 test('bulk category action applies only explicit selected customers', function (): void {
-    [$user, $client] = customerOperator();
-    $category = CustomerCategory::factory()->for($client)->create();
-    $customers = Debtor::factory()->count(3)->for($client)->create();
+    $user = staffManager();
+    $category = CustomerCategory::factory()->create();
+    $customers = Debtor::factory()->count(3)->create();
 
     Livewire::actingAs($user)->test(Categories::class)->call('members', $category->public_id)->set('selectedCustomers', [$customers[0]->id, $customers[1]->id])->call('applyMemberships')->assertHasNoErrors()->assertSee('Category operation applied to 2 explicitly selected customers.');
 
@@ -171,31 +180,31 @@ test('bulk category action applies only explicit selected customers', function (
     $this->assertDatabaseMissing('customer_category_assignments', ['customer_id' => $customers[2]->id]);
 });
 
-test('revoked scope blocks a previously opened customer form', function (): void {
-    [$user, $client] = customerOperator();
-    $customer = app(SaveCustomer::class)->handle($user, customerInput($client));
+test('revoked permission blocks a previously opened customer form', function (): void {
+    $user = staffManager();
+    $customer = app(SaveCustomer::class)->handle($user, customerInput());
     $component = Livewire::actingAs($user)->test(Editor::class, ['customer' => $customer]);
-    $user->clientScopes()->update(['valid_to' => now()->format('Y-m-d H:i:s.uP')]);
+    $user->syncRoles([]);
 
-    $component->call('save')->assertNotFound();
+    $component->call('save')->assertForbidden();
 
     expect($customer->fresh()->display_name_ciphertext)->toBe('Nur Aisyah Tan');
 });
 
-test('cross-client category rolls back the entire customer creation', function (): void {
+test('an inactive category rolls back the entire customer creation', function (): void {
     $audits = AuditLog::query()->count();
-    [$user, $client] = customerOperator();
-    $foreignCategory = CustomerCategory::factory()->create();
+    $user = staffManager();
+    $inactiveCategory = CustomerCategory::factory()->create(['is_active' => false]);
 
-    expect(fn () => app(SaveCustomer::class)->handle($user, customerInput($client, ['category_ids' => [$foreignCategory->id]])))->toThrow(ValidationException::class);
+    expect(fn () => app(SaveCustomer::class)->handle($user, customerInput(['category_ids' => [$inactiveCategory->id]])))->toThrow(ValidationException::class);
 
     $this->assertDatabaseCount('debtors', 0);
     $this->assertDatabaseCount('audit_logs', $audits);
 });
 
 test('customer update without contact grant preserves contacts and hides editor values', function (): void {
-    [$user, $client] = customerOperator();
-    $customer = app(SaveCustomer::class)->handle($user, customerInput($client, ['contacts' => [['kind' => 'email', 'value' => 'private-contact@example.test', 'is_primary' => true]]]));
+    $user = staffManager();
+    $customer = app(SaveCustomer::class)->handle($user, customerInput(['contacts' => [['kind' => 'email', 'value' => 'private-contact@example.test', 'is_primary' => true]]]));
     $user->removeRole('Admin');
     $user->givePermissionTo(['admin.access', 'customers.view', 'customers.update']);
 
@@ -206,22 +215,22 @@ test('customer update without contact grant preserves contacts and hides editor 
 });
 
 test('bulk category operation rolls back all selections when one is stale', function (): void {
-    [$user, $client] = customerOperator();
-    $category = CustomerCategory::factory()->for($client)->create();
-    $customers = Debtor::factory()->count(2)->for($client)->create();
+    $user = staffManager();
+    $category = CustomerCategory::factory()->create();
+    $customers = Debtor::factory()->count(2)->create();
     $component = Livewire::actingAs($user)->test(Categories::class)->call('members', $category->public_id)->set('selectedCustomers', $customers->pluck('id')->all());
-    app(SaveCustomer::class)->handle($user, customerInput($client, ['customer_reference' => $customers[1]->customer_reference, 'name' => 'Concurrent update']), $customers[1], $customers[1]->revision());
+    app(SaveCustomer::class)->handle($user, customerInput(['customer_reference' => $customers[1]->customer_reference, 'name' => 'Concurrent update']), $customers[1], $customers[1]->revision());
 
     $component->call('applyMemberships')->assertHasErrors('selectedCustomers');
 
     $this->assertDatabaseCount('customer_category_assignments', 0);
 });
 
-test('new customer reference duplicates are field errors within the same client', function (): void {
-    [$user, $client] = customerOperator();
-    app(SaveCustomer::class)->handle($user, customerInput($client));
+test('new customer reference duplicates are field errors', function (): void {
+    $user = staffManager();
+    app(SaveCustomer::class)->handle($user, customerInput());
 
-    Livewire::actingAs($user)->test(Editor::class)->set('data', customerInput($client))->call('save')->assertHasErrors('data.customer_reference');
+    Livewire::actingAs($user)->test(Editor::class)->set('data', customerInput())->call('save')->assertHasErrors('data.customer_reference');
 
     $this->assertDatabaseCount('debtors', 1);
 });

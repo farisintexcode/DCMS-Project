@@ -22,11 +22,6 @@ class CommunicationBatch extends Model
         return ['selection_criteria' => 'array', 'counts' => 'array', 'confirmed_at' => 'immutable_datetime', 'lock_version' => 'integer'];
     }
 
-    public function client(): BelongsTo
-    {
-        return $this->belongsTo(Client::class);
-    }
-
     public function template(): BelongsTo
     {
         return $this->belongsTo(CommunicationTemplate::class);

@@ -4,7 +4,6 @@ namespace App\Actions\Assignments;
 
 use App\Enums\BatchStatus;
 use App\Models\AssignmentBatch;
-use App\Models\Client;
 use App\Models\User;
 use App\Services\Assignments\BatchWork;
 use App\Services\AuditWriter;
@@ -20,8 +19,7 @@ class ChangeBatchStatus
     public function handle(User $actor, AssignmentBatch $target, string $status, string $reason, int $version): AssignmentBatch
     {
         return DB::transaction(function () use ($actor, $target, $status, $reason, $version): AssignmentBatch {
-            $client = Client::query()->lockForUpdate()->findOrFail($target->client_id);
-            abort_unless($actor->hasClientScope($client), 404);
+            abort_unless($actor->isActive(), 404);
             $batch = AssignmentBatch::query()->lockForUpdate()->findOrFail($target->id);
             Gate::forUser($actor)->authorize('update', $batch);
             Validator::make(['targetStatus' => $status, 'reason' => trim($reason)], ['targetStatus' => ['required', 'in:active,archived'], 'reason' => ['required', 'string', 'max:1000']])->validate();

@@ -4,7 +4,6 @@ namespace App\Actions\Tasks;
 
 use App\Enums\BatchStatus;
 use App\Models\AssignmentBatch;
-use App\Models\Client;
 use App\Models\DebtAccount;
 use App\Models\Debtor;
 use App\Models\Task;
@@ -26,14 +25,13 @@ class SaveTask
 
         return DB::transaction(function () use ($actor, $input, $existing, $version): Task {
             $context = $existing ? AssignmentBatch::query()->findOrFail($existing->assignment_batch_id) : AssignmentBatch::query()->findOrFail($input['assignment_batch_id']);
-            $client = Client::query()->lockForUpdate()->findOrFail($context->client_id);
-            abort_unless($actor->hasClientScope($client), 404);
+            abort_unless($actor->isActive(), 404);
             $batch = AssignmentBatch::query()->lockForUpdate()->findOrFail($context->id);
             if ($batch->status !== BatchStatus::Active) {
                 throw ValidationException::withMessages(['data.assignment_batch_id' => 'Archived assignments cannot accept task changes.']);
             }
             $task = $existing ? Task::query()->lockForUpdate()->findOrFail($existing->id) : new Task;
-            Gate::forUser($actor)->authorize($existing ? 'update' : 'create', $existing ? $task : [Task::class, $client]);
+            Gate::forUser($actor)->authorize($existing ? 'update' : 'create', $existing ? $task : Task::class);
             if ($existing && ($version === null || $version !== $task->lock_version)) {
                 throw ValidationException::withMessages(['version' => 'This task changed. Reload and review before saving.']);
             }
@@ -43,8 +41,8 @@ class SaveTask
             if ($existing && ((int) $input['assignment_batch_id'] !== $task->assignment_batch_id || (int) $input['debt_account_id'] !== $task->debt_account_id || (int) $input['customer_id'] !== $task->customer_id)) {
                 throw ValidationException::withMessages(['data.customer_id' => 'Task identity is fixed. Cancel and create a corrected task to change its source context.']);
             }
-            $account = DebtAccount::query()->where('client_id', $client->id)->lockForUpdate()->findOrFail($input['debt_account_id']);
-            $customer = Debtor::query()->where('client_id', $client->id)->lockForUpdate()->findOrFail($input['customer_id']);
+            $account = DebtAccount::query()->lockForUpdate()->findOrFail($input['debt_account_id']);
+            $customer = Debtor::query()->lockForUpdate()->findOrFail($input['customer_id']);
             if (! $existing && ($account->status !== 'active' || $customer->status !== 'active' || ! $account->parties()->where('debtor_id', $customer->id)->where('valid_from', '<=', now()->format('Y-m-d H:i:s.uP'))->where(fn ($q) => $q->whereNull('valid_to')->orWhere('valid_to', '>', now()->format('Y-m-d H:i:s.uP')))->exists())) {
                 throw ValidationException::withMessages(['data.debt_account_id' => 'Select an active account with a current relationship to this customer.']);
             }

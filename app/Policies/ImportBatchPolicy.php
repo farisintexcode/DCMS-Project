@@ -2,7 +2,6 @@
 
 namespace App\Policies;
 
-use App\Models\Client;
 use App\Models\ImportBatch;
 use App\Models\User;
 
@@ -15,12 +14,12 @@ class ImportBatchPolicy
 
     public function view(User $user, ImportBatch $batch): bool
     {
-        return $this->viewAny($user) && $user->hasClientScope($batch->client);
+        return $this->viewAny($user);
     }
 
-    public function create(User $user, Client $client): bool
+    public function create(User $user): bool
     {
-        return $this->viewAny($user) && $user->can('imports.map') && $user->hasClientScope($client);
+        return $this->viewAny($user) && $user->can('imports.map');
     }
 
     public function map(User $user, ImportBatch $batch): bool

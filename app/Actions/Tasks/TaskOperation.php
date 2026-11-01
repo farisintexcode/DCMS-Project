@@ -6,7 +6,6 @@ use App\Enums\BatchStatus;
 use App\Models\AssignmentBatch;
 use App\Models\BulkOperation;
 use App\Models\BulkOperationItem;
-use App\Models\Client;
 use App\Models\OutboxEvent;
 use App\Models\Staff;
 use App\Models\Task;
@@ -27,7 +26,7 @@ class TaskOperation
     public function authorize(User $actor, AssignmentBatch $batch, string $operation): void
     {
         Gate::forUser($actor)->authorize('viewAny', Task::class);
-        abort_unless($actor->hasClientScope($batch->client), 404);
+        abort_unless($actor->isActive(), 404);
         $permission = match ($operation) {
             'new' => 'tasks.assign','replace','reassign','unassign' => 'tasks.reassign','cancel' => 'tasks.cancel',default => null
         };
@@ -40,11 +39,10 @@ class TaskOperation
     public function prepare(User $actor, array $input): BulkOperation
     {
         $data = Validator::make($input, ['assignment_batch_id' => ['required', 'integer'], 'operation_code' => ['required', Rule::in(['new', 'replace', 'reassign', 'unassign', 'cancel'])], 'selection_mode' => ['required', Rule::in(['single', 'selected', 'range'])], 'task_ids' => ['required_unless:selection_mode,range', 'array', 'min:1', 'max:200'], 'task_ids.*' => ['integer', 'distinct'], 'target_collector_id' => ['nullable', 'required_unless:operation_code,unassign,cancel', 'integer'], 'reason' => ['required', 'string', 'min:3', 'max:2000']])->validate();
-        $context = AssignmentBatch::query()->with('client')->findOrFail($data['assignment_batch_id']);
+        $context = AssignmentBatch::query()->findOrFail($data['assignment_batch_id']);
 
         return DB::transaction(function () use ($actor, $data, $context): BulkOperation {
-            Client::query()->lockForUpdate()->findOrFail($context->client_id);
-            $batch = AssignmentBatch::query()->with('client')->lockForUpdate()->findOrFail($context->id);
+            $batch = AssignmentBatch::query()->lockForUpdate()->findOrFail($context->id);
             $this->authorize($actor, $batch, $data['operation_code']);
             if ($data['selection_mode'] === 'range') {
                 throw ValidationException::withMessages(['operation' => 'IWK range processing requires an approved numeric source contract (G02). Use explicit task selection for manual tasks.']);
@@ -52,7 +50,7 @@ class TaskOperation
             if ($data['selection_mode'] === 'single' && count($data['task_ids']) !== 1) {
                 throw ValidationException::withMessages(['operation' => 'Single-task mode requires exactly one task.']);
             }
-            $target = in_array($data['operation_code'], ['unassign', 'cancel'], true) ? null : $this->rider((int) $data['target_collector_id'], $batch);
+            $target = in_array($data['operation_code'], ['unassign', 'cancel'], true) ? null : $this->rider((int) $data['target_collector_id']);
             $tasks = Task::query()->where('assignment_batch_id', $batch->id)->whereIn('id', $data['task_ids'])->with('currentAllocation')->orderBy('id')->lockForUpdate()->get();
             if ($tasks->count() !== count($data['task_ids'])) {
                 abort(404);
@@ -84,7 +82,7 @@ class TaskOperation
                 throw ValidationException::withMessages(['operation' => 'This preview is no longer current. Prepare a new selection.']);
             }
             if ($operation->target_collector_id) {
-                $this->rider($operation->target_collector_id, $batch);
+                $this->rider($operation->target_collector_id);
             }
             $selection = $operation->items()->with('task.currentAllocation')->orderBy('task_id')->get();
             $criteria = $selection->map(fn ($item) => [$item->task_id, $item->task->lock_version, $item->task->currentAllocation?->id])->all();
@@ -131,7 +129,7 @@ class TaskOperation
                     DB::transaction(function () use ($actor, $batch, $operation, $task, $item): void {
                         $this->authorize($actor, $batch, $operation->operation_code);
                         if ($operation->target_collector_id) {
-                            $this->rider($operation->target_collector_id, $batch);
+                            $this->rider($operation->target_collector_id);
                         }
                         if ($task->lock_version !== $item->expected_version || $this->exclusion($task, $operation->operation_code, $operation->target_collector_id)) {
                             throw ValidationException::withMessages(['operation' => 'stale_task']);
@@ -211,11 +209,11 @@ class TaskOperation
         });
     }
 
-    private function rider(int $id, AssignmentBatch $batch): Staff
+    private function rider(int $id): Staff
     {
         $staff = Staff::query()->with('user')->lockForUpdate()->findOrFail($id);
-        if (! $staff->is_active || ! $staff->is_rider || ! $staff->user || ! $staff->user->canUseRiderInterface() || ! $staff->user->hasClientScope($batch->client)) {
-            throw ValidationException::withMessages(['target_collector_id' => 'Choose an active Rider login with current access to this client.']);
+        if (! $staff->is_active || ! $staff->is_rider || ! $staff->user || ! $staff->user->canUseRiderInterface()) {
+            throw ValidationException::withMessages(['target_collector_id' => 'Choose an active Rider login.']);
         }
 
         return $staff;
@@ -254,8 +252,7 @@ class TaskOperation
     {
         return DB::transaction(function () use ($id, $callback): mixed {
             $original = BulkOperation::query()->with('batch')->findOrFail($id);
-            Client::query()->lockForUpdate()->findOrFail($original->batch->client_id);
-            $batch = AssignmentBatch::query()->with('client')->lockForUpdate()->findOrFail($original->assignment_batch_id);
+            $batch = AssignmentBatch::query()->lockForUpdate()->findOrFail($original->assignment_batch_id);
             $operation = BulkOperation::query()->lockForUpdate()->findOrFail($id);
 
             return $callback($operation, $batch);

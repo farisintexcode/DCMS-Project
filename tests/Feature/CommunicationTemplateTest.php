@@ -8,7 +8,6 @@ use App\Models\Debtor;
 use App\Models\IntegrationAccount;
 use App\Models\Task;
 use App\Models\User;
-use App\Models\UserClientScope;
 use App\Services\Communications\TemplateContext;
 use App\Services\Communications\TemplateRenderer;
 use Database\Seeders\CommunicationTemplateSeeder;
@@ -67,12 +66,12 @@ test('three approved owner defaults seed idempotently without fabricating approv
     expect(Gate::forUser($admin)->allows('approve', templateDraft($admin)))->toBeFalse();
 });
 
-test('template workspace enforces administrative communication grants and current customer scope', function (): void {
+test('template workspace enforces administrative communication grants', function (): void {
     $this->get(route('admin.communications.index'))->assertRedirect(route('login'));
-    [$actor] = customerOperator();
+    $actor = staffManager();
     $this->actingAs($actor)->get(route('admin.communications.index'))->assertOk()->assertSee('Communications')->assertSee('View approved option 1')->assertSee('Friendly Payment Reminder');
     $this->get(route('admin.communications.templates.edit', templateDefault()))->assertOk()->assertSee('Saved wording');
-    $this->get(route('admin.communications.templates.edit', ['template' => templateDefault()->public_id, 'customer' => Debtor::factory()->create()->public_id]))->assertNotFound();
+    $this->get(route('admin.communications.templates.edit', ['template' => templateDefault()->public_id, 'customer' => (string) Str::uuid7()]))->assertNotFound();
     $actor->syncRoles([]);
     $actor->givePermissionTo('admin.access');
     $this->get(route('admin.communications.index'))->assertForbidden();
@@ -164,23 +163,21 @@ test('renderer substitutes literal values once and lists optional missing data',
     expect($result['subject'])->toBe('For <script>{{company_name}}</script>')->and($result['body'])->toBe('<script>{{company_name}}</script> / ')->and($result['missing_optional'])->toBe(['outstanding_amount']);
 });
 
-test('actual customer previews preserve portfolio account and missing financial provenance boundaries', function (): void {
-    [$actor,$client] = customerOperator();
-    $customer = Debtor::factory()->create(['client_id' => $client->id]);
+test('actual customer previews use the configured company name and preserve account and missing financial provenance boundaries', function (): void {
+    $actor = staffManager();
+    $customer = Debtor::factory()->create();
     $context = app(TemplateContext::class);
     $data = $context->values($actor, $customer->public_id);
-    expect($data['values']['customer_name'])->toBe($customer->display_name_ciphertext)->and($data['values']['company_name'])->toBe($client->name)->and($data['values']['outstanding_amount'])->toBeNull()->and($data['values']['due_date'])->toBeNull();
+    expect($data['values']['customer_name'])->toBe($customer->display_name_ciphertext)->and($data['values']['company_name'])->toBe(config('communications.company_name'))->and($data['values']['outstanding_amount'])->toBeNull()->and($data['values']['due_date'])->toBeNull();
     expect(fn () => app(TemplateRenderer::class)->render(templateDefault(), $data['values']))->toThrow(ValidationException::class);
     $task = Task::factory()->create();
     expect(fn () => $context->values($actor, $customer->public_id, taskId: $task->public_id))->toThrow(ModelNotFoundException::class);
-    UserClientScope::query()->where('user_id', $actor->id)->update(['valid_to' => now()->format('Y-m-d H:i:s.u')]);
-    expect(fn () => $context->values($actor, $customer->public_id))->toThrow(ModelNotFoundException::class);
 });
 
 test('Livewire previews escape customer markup and submission refuses unsaved edits', function (): void {
     Mail::fake();
-    [$actor,$client] = customerOperator();
-    $customer = Debtor::factory()->create(['client_id' => $client->id, 'display_name_ciphertext' => '<img src=x onerror=alert(1)>']);
+    $actor = staffManager();
+    $customer = Debtor::factory()->create(['display_name_ciphertext' => '<img src=x onerror=alert(1)>']);
     $saved = app(ManageTemplates::class)->save($actor, templateDraft($actor), 0, templateWording());
     $this->actingAs($actor);
     Livewire::test(Editor::class, ['template' => $saved])->set('customerId', $customer->public_id)->call('preview', 'customer')->assertHasNoErrors()->assertSee('<img src=x onerror=alert(1)>')->assertDontSeeHtml('<img src=x onerror=alert(1)>')->set('form.body', 'Unsaved edit')->call('submitForApproval')->assertHasErrors('revision');

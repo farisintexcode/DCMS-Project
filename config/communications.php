@@ -16,12 +16,13 @@ return [
     'max_attempts' => 3,
     'attempt_timeout' => 120,
     'preview_max_recipients' => 250,
-    'basis_codes' => ['EXISTING_ACCOUNT_RELATIONSHIP', 'CLIENT_AUTHORIZED_COLLECTION', 'CUSTOMER_PROVIDED_CONTACT', 'EXPLICIT_SERVICE_CONSENT', 'LEGAL_OR_REGULATORY_BASIS'],
+    'company_name' => env('DCMS_COMPANY_NAME') ?: env('APP_NAME', 'Nexora'),
+    'basis_codes' => ['EXISTING_ACCOUNT_RELATIONSHIP', 'AUTHORIZED_COLLECTION', 'CUSTOMER_PROVIDED_CONTACT', 'EXPLICIT_SERVICE_CONSENT', 'LEGAL_OR_REGULATORY_BASIS'],
     'preference_states' => ['allowed', 'blocked', 'unknown', 'withdrawn', 'invalid_address', 'hard_bounced', 'under_review'],
     'placeholders' => [
         'customer_name' => 'Customer name', 'account_number' => 'Selected account number',
         'outstanding_amount' => 'Outstanding amount from approved financial source',
-        'due_date' => 'Payment due date from approved financial source', 'company_name' => 'Commissioning client name',
+        'due_date' => 'Payment due date from approved financial source', 'company_name' => 'Company name',
     ],
     'defaults' => [
         1 => [

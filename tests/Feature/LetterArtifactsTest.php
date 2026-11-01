@@ -11,7 +11,6 @@ use App\Models\CommunicationTemplate;
 use App\Models\Debtor;
 use App\Models\Document;
 use App\Models\OutboxEvent;
-use App\Models\UserClientScope;
 use App\Services\Communications\LetterPdf;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -35,9 +34,9 @@ beforeEach(function (): void {
 
 function letterFixture(): array
 {
-    [$actor, $client] = customerOperator();
+    $actor = staffManager();
     $actor->givePermissionTo(['communications.generate_letter', 'templates.approve']);
-    $customer = Debtor::factory()->create(['client_id' => $client->id]);
+    $customer = Debtor::factory()->create();
     $source = CommunicationTemplate::query()->where('email_slot', 1)->where('status', 'approved')->firstOrFail();
     $manage = app(ManageTemplates::class);
     $draft = $manage->createVersion($actor, $source);
@@ -61,7 +60,7 @@ function letterQueue(array $fixture): Communication
     return $letters->confirm($fixture[0], $letter->id, $letters->digest($letter));
 }
 
-test('letters require authentication separate generation permission and current customer scope', function (): void {
+test('letters require authentication and separate generation permission', function (): void {
     $this->get(route('admin.communications.letters'))->assertRedirect(route('login'));
     $fixture = letterFixture();
     [$actor, $customer, $template] = $fixture;
@@ -70,7 +69,7 @@ test('letters require authentication separate generation permission and current 
     Livewire::actingAs($actor)->test(Letters::class)->set('customerId', $customer->public_id)->set('templateId', $template->public_id)->call('preview')->assertForbidden();
     expect(Communication::query()->count())->toBe(0);
     $actor->givePermissionTo('communications.generate_letter');
-    $fixture[3]['customer'] = Debtor::factory()->create()->public_id;
+    $fixture[3]['customer'] = (string) Str::uuid7();
     expect(fn () => letterPreview($fixture))->toThrow(ModelNotFoundException::class);
 });
 
@@ -124,15 +123,15 @@ test('worker cancels queued letters when requesters lose access or templates are
     Storage::fake('s3');
     $fixture = letterFixture();
     $letter = letterQueue($fixture);
-    if ($condition === 'scope') {
-        UserClientScope::query()->where('user_id', $fixture[0]->id)->update(['valid_to' => now()]);
+    if ($condition === 'permission') {
+        $fixture[0]->syncRoles([]);
     } else {
         app(ManageTemplates::class)->archive($fixture[0], $fixture[2], $fixture[2]->lock_version);
     }
     app(ManageLetters::class)->generate($letter->id);
     expect($letter->refresh()->delivery_status)->toBe('cancelled')->and(Document::query()->count())->toBe(0);
     Storage::disk('s3')->assertDirectoryEmpty('letters');
-})->with(['scope', 'template']);
+})->with(['permission', 'template']);
 
 test('failed generation is retryable without replacing content or hiding failure history', function (): void {
     Storage::fake('s3');
@@ -147,7 +146,7 @@ test('failed generation is retryable without replacing content or hiding failure
     expect($letter->refresh()->delivery_status)->toBe('queued')->and(CommunicationEvent::query()->where('event_code', 'letter_failed')->count())->toBe(1)->and(OutboxEvent::query()->where('event_type', 'letter.generate')->count())->toBe(2);
 });
 
-test('signed downloads enforce user binding current scope expiry and private artifact integrity', function (): void {
+test('signed downloads enforce user binding expiry and private artifact integrity', function (): void {
     Storage::fake('s3');
     $fixture = letterFixture();
     $letter = letterQueue($fixture);
@@ -160,8 +159,6 @@ test('signed downloads enforce user binding current scope expiry and private art
     $document = $letter->documents()->sole();
     Storage::disk('s3')->put($document->object_key, Crypt::encryptString('%PDF-tampered'));
     $this->get($url)->assertStatus(503);
-    UserClientScope::query()->where('user_id', $fixture[0]->id)->update(['valid_to' => now()]);
-    $this->get($url)->assertNotFound();
     $this->travel(6)->minutes();
     $this->get($url)->assertForbidden();
 });

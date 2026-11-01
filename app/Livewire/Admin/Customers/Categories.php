@@ -4,10 +4,8 @@ namespace App\Livewire\Admin\Customers;
 
 use App\Actions\Customers\SaveCategory;
 use App\Actions\Customers\SyncCustomerCategories;
-use App\Models\Client;
 use App\Models\CustomerCategory;
 use App\Models\Debtor;
-use App\Services\ClientAccess;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -30,13 +28,11 @@ class Categories extends Component
     #[Locked]
     public ?string $revision = null;
 
-    public string $client = '';
-
     public string $status = '';
 
     public string $query = '';
 
-    public array $data = ['client_id' => '', 'code' => '', 'name' => '', 'description' => '', 'is_active' => true];
+    public array $data = ['code' => '', 'name' => '', 'description' => '', 'is_active' => true];
 
     #[Locked]
     public ?int $membershipCategoryId = null;
@@ -53,7 +49,7 @@ class Categories extends Component
     public function members(string $publicId): void
     {
         abort_unless(Auth::user()->can('customers.categorize') && Auth::user()->can('customers.view'), 403);
-        $category = app(ClientAccess::class)->scope(CustomerCategory::query(), Auth::user())->where('public_id', $publicId)->firstOrFail();
+        $category = CustomerCategory::query()->where('public_id', $publicId)->firstOrFail();
         $this->membershipCategoryId = $category->id;
         $this->reset('selectedCustomers', 'selectionVersions', 'memberReference');
     }
@@ -61,8 +57,8 @@ class Categories extends Component
     public function updatedSelectedCustomers(): void
     {
         $this->validate(['selectedCustomers' => ['array', 'max:50'], 'selectedCustomers.*' => ['integer', 'distinct']]);
-        $category = app(ClientAccess::class)->scope(CustomerCategory::query(), Auth::user())->findOrFail($this->membershipCategoryId);
-        $customers = Debtor::query()->where('client_id', $category->client_id)->whereIn('id', $this->selectedCustomers)->get();
+        $category = CustomerCategory::query()->findOrFail($this->membershipCategoryId);
+        $customers = Debtor::query()->whereIn('id', $this->selectedCustomers)->get();
         abort_unless($customers->count() === count($this->selectedCustomers), 404);
         $versions = [];
         foreach ($customers as $customer) {
@@ -76,9 +72,8 @@ class Categories extends Component
         abort_unless(Auth::user()->can('customers.categorize') && Auth::user()->can('customers.view'), 403);
         $this->validate(['selectedCustomers' => ['required', 'array', 'min:1', 'max:50'], 'selectedCustomers.*' => ['integer', 'distinct'], 'membershipOperation' => ['required', 'in:assign,revoke']]);
         DB::transaction(function () use ($sync): void {
-            $category = app(ClientAccess::class)->scope(CustomerCategory::query(), Auth::user())->findOrFail($this->membershipCategoryId);
-            Client::query()->lockForUpdate()->findOrFail($category->client_id);
-            $customers = Debtor::query()->with('client')->where('client_id', $category->client_id)->whereIn('id', $this->selectedCustomers)->orderBy('id')->lockForUpdate()->get();
+            $category = CustomerCategory::query()->findOrFail($this->membershipCategoryId);
+            $customers = Debtor::query()->whereIn('id', $this->selectedCustomers)->orderBy('id')->lockForUpdate()->get();
             abort_unless($customers->count() === count($this->selectedCustomers), 404);
             foreach ($customers as $customer) {
                 Gate::authorize('categorize', $customer);
@@ -97,11 +92,11 @@ class Categories extends Component
 
     public function edit(string $publicId): void
     {
-        $category = app(ClientAccess::class)->scope(CustomerCategory::query(), Auth::user())->where('public_id', $publicId)->with('client')->firstOrFail();
+        $category = CustomerCategory::query()->where('public_id', $publicId)->firstOrFail();
         Gate::authorize('update', $category);
         $this->categoryId = $category->id;
         $this->revision = $category->revision();
-        $this->data = $category->only('client_id', 'code', 'name', 'description', 'is_active');
+        $this->data = $category->only('code', 'name', 'description', 'is_active');
     }
 
     public function cancel(): void
@@ -112,7 +107,7 @@ class Categories extends Component
 
     public function updated(string $property): void
     {
-        if (in_array($property, ['client', 'status', 'query'])) {
+        if (in_array($property, ['status', 'query'])) {
             $this->resetPage();
         }
     }
@@ -131,11 +126,7 @@ class Categories extends Component
         if ($this->membershipCategoryId) {
             abort_unless(Auth::user()->can('customers.view') && Auth::user()->can('customers.categorize'), 403);
         }
-        $access = app(ClientAccess::class);
-        $query = $access->scope(CustomerCategory::query(), Auth::user())->with('client')->withCount(['categoryAssignments as current_members' => fn ($q) => $q->whereNull('revoked_at')]);
-        if ($this->client !== '') {
-            $query->where('client_id', (int) $this->client);
-        }
+        $query = CustomerCategory::query()->withCount(['categoryAssignments as current_members' => fn ($q) => $q->whereNull('revoked_at')]);
         if (in_array($this->status, ['active', 'inactive'])) {
             $query->where('is_active', $this->status === 'active');
         }
@@ -143,9 +134,9 @@ class Categories extends Component
             $query->where(fn ($q) => $q->where('code', 'ilike', '%'.mb_substr($this->query, 0, 100).'%')->orWhere('name', 'ilike', '%'.mb_substr($this->query, 0, 100).'%'));
         }
 
-        $membershipCategory = $this->membershipCategoryId ? $access->scope(CustomerCategory::query(), Auth::user())->findOrFail($this->membershipCategoryId) : null;
-        $members = $membershipCategory ? Debtor::query()->where('client_id', $membershipCategory->client_id)->when($this->memberReference !== '', fn ($q) => $q->where('customer_reference', trim($this->memberReference)))->orderBy('id')->limit(50)->get() : collect();
+        $membershipCategory = $this->membershipCategoryId ? CustomerCategory::query()->findOrFail($this->membershipCategoryId) : null;
+        $members = $membershipCategory ? Debtor::query()->when($this->memberReference !== '', fn ($q) => $q->where('customer_reference', trim($this->memberReference)))->orderBy('id')->limit(50)->get() : collect();
 
-        return view('livewire.admin.customers.categories', ['categories' => $query->orderBy('name')->orderBy('id')->paginate(25), 'clients' => $access->clients(Auth::user())->orderBy('name')->get(), 'membershipCategory' => $membershipCategory, 'memberCustomers' => $members]);
+        return view('livewire.admin.customers.categories', ['categories' => $query->orderBy('name')->orderBy('id')->paginate(25), 'membershipCategory' => $membershipCategory, 'memberCustomers' => $members]);
     }
 }

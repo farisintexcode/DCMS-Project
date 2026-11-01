@@ -16,8 +16,8 @@ beforeEach(function (): void {
 });
 
 test('indexed search handles exact references identifiers contacts and name prefixes', function (string $kind, string $query, bool $found): void {
-    [$user, $client] = customerOperator();
-    $customer = app(SaveCustomer::class)->handle($user, customerInput($client, ['identity' => '001122-33-4455', 'contacts' => [['kind' => 'email', 'value' => 'NuR@example.test', 'is_primary' => true]]]));
+    $user = staffManager();
+    $customer = app(SaveCustomer::class)->handle($user, customerInput(['identity' => '001122-33-4455', 'contacts' => [['kind' => 'email', 'value' => 'NuR@example.test', 'is_primary' => true]]]));
 
     $ids = app(CustomerSearch::class)->apply(Debtor::query(), $kind, $query)->pluck('id')->all();
 
@@ -27,19 +27,18 @@ test('indexed search handles exact references identifiers contacts and name pref
     ['identifier', '001122334455', true], ['identifier', '1122334455', false], ['contact', 'nur@EXAMPLE.test', true], ['contact', 'nur@', false],
 ]);
 
-test('list search and manipulated filters never reveal other client customers', function (): void {
-    [$user, $client] = customerOperator();
-    app(SaveCustomer::class)->handle($user, customerInput($client));
-    $foreign = Debtor::factory()->create(['display_name_ciphertext' => 'Foreign protected record']);
+test('list search shows every customer and manipulated filters stay safe', function (): void {
+    $user = staffManager();
+    app(SaveCustomer::class)->handle($user, customerInput());
+    Debtor::factory()->create(['display_name_ciphertext' => 'Second listed record']);
 
-    Livewire::actingAs($user)->test(Index::class)->assertSee('Nur Aisyah Tan')->assertDontSee('Foreign protected record')
-        ->set('client', (string) $foreign->client_id)->assertDontSee('Foreign protected record')
-        ->set('client', 'invalid-sql')->assertOk()->assertDontSee('Nur Aisyah Tan');
+    Livewire::actingAs($user)->test(Index::class)->assertSee('Nur Aisyah Tan')->assertSee('Second listed record')
+        ->set('status', 'invalid-sql')->assertOk()->assertDontSee('Nur Aisyah Tan');
 });
 
 test('keyed tokens omit plaintext and missing key fails closed', function (): void {
-    [$user, $client] = customerOperator();
-    $customer = app(SaveCustomer::class)->handle($user, customerInput($client));
+    $user = staffManager();
+    $customer = app(SaveCustomer::class)->handle($user, customerInput());
     expect(json_encode($customer->search_tokens))->not->toContain('aisyah', 'nur', 'tan');
     config(['dcms.search_key' => null]);
 

@@ -46,7 +46,7 @@ class Show extends Component
 
     private function batch(): CommunicationBatch
     {
-        $batch = app(RecipientAccess::class)->batches(auth()->user())->with(['client', 'template', 'requester'])->findOrFail($this->batchId);
+        $batch = app(RecipientAccess::class)->batches(auth()->user())->with(['template', 'requester'])->findOrFail($this->batchId);
         Gate::authorize('view', $batch);
 
         return $batch;

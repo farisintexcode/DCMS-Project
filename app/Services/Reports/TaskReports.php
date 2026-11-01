@@ -4,7 +4,6 @@ namespace App\Services\Reports;
 
 use App\Models\Task;
 use App\Models\User;
-use App\Services\Tasks\TaskAccess;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
@@ -21,7 +20,7 @@ class TaskReports
 {
     public const FAMILIES = ['task' => 'Task', 'rider_assignment' => 'Rider Assignment', 'rider_performance' => 'Rider Performance', 'completed_task' => 'Completed Task', 'verification' => 'Verification'];
 
-    public const COLUMNS = ['task_reference' => 'Task reference', 'iwk_id' => 'IWK ID', 'client' => 'Client', 'batch' => 'Assignment', 'customer_reference' => 'Customer reference', 'account_reference' => 'Masked account', 'rider_staff_no' => 'Current Rider staff no.', 'work_status' => 'Work status', 'review_status' => 'Review status', 'created_at' => 'Created (MYT)', 'due_at' => 'Due (MYT)', 'submitted_at' => 'Submitted (MYT)', 'completed_at' => 'Completed (MYT)', 'excluded' => 'Excluded', 'payment_update' => 'Payment update marker'];
+    public const COLUMNS = ['task_reference' => 'Task reference', 'iwk_id' => 'IWK ID', 'batch' => 'Assignment', 'customer_reference' => 'Customer reference', 'account_reference' => 'Masked account', 'rider_staff_no' => 'Current Rider staff no.', 'work_status' => 'Work status', 'review_status' => 'Review status', 'created_at' => 'Created (MYT)', 'due_at' => 'Due (MYT)', 'submitted_at' => 'Submitted (MYT)', 'completed_at' => 'Completed (MYT)', 'excluded' => 'Excluded', 'payment_update' => 'Payment update marker'];
 
     public const PERFORMANCE = ['rider_staff_no' => 'Current Rider staff no.', 'allocated' => 'Current allocated tasks', 'completed' => 'Verified/completed tasks', 'pending_verification' => 'Pending verification', 'returned' => 'Returned tasks'];
 
@@ -43,7 +42,7 @@ class TaskReports
         return Validator::make($input, [
             'family' => ['required', Rule::in(array_keys(self::FAMILIES))],
             'from' => ['nullable', 'date_format:Y-m-d'], 'until' => ['nullable', 'date_format:Y-m-d', Rule::when(! empty($input['from']), 'after_or_equal:from')],
-            'client' => ['nullable', 'uuid'], 'batch' => ['nullable', 'uuid'], 'rider' => ['nullable', 'string', 'max:100'],
+            'batch' => ['nullable', 'uuid'], 'rider' => ['nullable', 'string', 'max:100'],
             'status' => ['nullable', Rule::in(['unstarted', 'in_progress', 'submitted', 'completed', 'cancelled'])],
             'iwk' => ['nullable', 'string', 'max:100'], 'columns' => ['required', 'array', 'min:1', 'max:15'],
             'columns.*' => ['required', 'distinct', Rule::in(array_keys(self::COLUMNS))],
@@ -56,15 +55,12 @@ class TaskReports
         if ($criteria['family'] === 'verification') {
             Gate::forUser($actor)->authorize('tasks.verify');
         }
-        $q = app(TaskAccess::class)->scope(Task::query(), $actor);
+        $q = Task::query();
         foreach (['from', 'until'] as $key) {
             if (! empty($criteria[$key])) {
                 $date = CarbonImmutable::createFromFormat('!Y-m-d', $criteria[$key], config('dcms.business_timezone'));
                 $q->where('created_at', $key === 'from' ? '>=' : '<=', ($key === 'from' ? $date->startOfDay() : $date->endOfDay())->utc());
             }
-        }
-        if (! empty($criteria['client'])) {
-            $q->whereHas('batch.client', fn ($b) => $b->where('public_id', $criteria['client']));
         }
         if (! empty($criteria['batch'])) {
             $q->whereHas('batch', fn ($b) => $b->where('public_id', $criteria['batch']));
@@ -99,7 +95,7 @@ class TaskReports
             if (DB::transactionLevel() === 1) {
                 DB::statement('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
             }
-            $tasks = $this->query($actor, $criteria)->with(['batch.client', 'customer', 'account', 'currentAllocation.collector'])->orderBy('id')->limit(config('reports.max_tasks') + 1)->get();
+            $tasks = $this->query($actor, $criteria)->with(['batch', 'customer', 'account', 'currentAllocation.collector'])->orderBy('id')->limit(config('reports.max_tasks') + 1)->get();
             if ($tasks->count() > config('reports.max_tasks')) {
                 throw ValidationException::withMessages(['report' => 'Narrow the filters to at most '.config('reports.max_tasks').' tasks.']);
             }
@@ -119,7 +115,7 @@ class TaskReports
     {
         $time = fn ($v) => $v?->timezone(config('dcms.business_timezone'))->format('Y-m-d H:i:s') ?? '';
 
-        return ['task_reference' => $task->public_id, 'iwk_id' => $task->source_iwk_id ?? '', 'client' => $task->batch->client->name, 'batch' => $task->batch->name, 'customer_reference' => $task->customer->customer_reference, 'account_reference' => Str::mask((string) $task->account->account_number, '*', 0, max(0, mb_strlen((string) $task->account->account_number) - 4)), 'rider_staff_no' => $task->currentAllocation?->collector?->staff_no ?? '', 'work_status' => $task->work_status, 'review_status' => $task->review_status, 'created_at' => $time($task->created_at), 'due_at' => $time($task->effectiveDue()), 'submitted_at' => $time($task->submitted_at), 'completed_at' => $time($task->completed_at), 'excluded' => $task->excluded ? 'Yes' : 'No', 'payment_update' => $task->payment_update_flag ? 'Yes' : 'No'];
+        return ['task_reference' => $task->public_id, 'iwk_id' => $task->source_iwk_id ?? '', 'batch' => $task->batch->name, 'customer_reference' => $task->customer->customer_reference, 'account_reference' => Str::mask((string) $task->account->account_number, '*', 0, max(0, mb_strlen((string) $task->account->account_number) - 4)), 'rider_staff_no' => $task->currentAllocation?->collector?->staff_no ?? '', 'work_status' => $task->work_status, 'review_status' => $task->review_status, 'created_at' => $time($task->created_at), 'due_at' => $time($task->effectiveDue()), 'submitted_at' => $time($task->submitted_at), 'completed_at' => $time($task->completed_at), 'excluded' => $task->excluded ? 'Yes' : 'No', 'payment_update' => $task->payment_update_flag ? 'Yes' : 'No'];
     }
 
     public function stillAccessible(User $actor, array $snapshot): bool
@@ -134,7 +130,7 @@ class TaskReports
                 Gate::forUser($actor)->authorize('tasks.verify');
             }
 
-            return app(TaskAccess::class)->scope(Task::query(), $actor)->whereIn('public_id', $snapshot['task_ids'])->count() === count($snapshot['task_ids']);
+            return Task::query()->whereIn('public_id', $snapshot['task_ids'])->count() === count($snapshot['task_ids']);
         } catch (AuthorizationException|HttpException) {
             return false;
         }

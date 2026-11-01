@@ -43,7 +43,7 @@ class Preferences extends Component
     {
         abort_unless(collect(['create', 'update', 'block', 'approve', 'override'])->contains(fn ($name) => auth()->user()->can('communication-permission.'.$name)), 403);
 
-        return app(RecipientAccess::class)->customers(auth()->user())->with('client')->findOrFail($this->customerId);
+        return app(RecipientAccess::class)->customers(auth()->user())->findOrFail($this->customerId);
     }
 
     private function resetForm(): void

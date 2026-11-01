@@ -5,7 +5,6 @@ namespace App\Livewire\Rider\Tasks;
 use App\Models\Task;
 use App\Models\TaskSubmission;
 use App\Services\Tasks\RiderAccess;
-use App\Services\Tasks\TaskAccess;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -57,7 +56,7 @@ class Index extends Component
         abort_unless(Auth::user()->can('tasks.view'), 403);
         $this->validate(['status' => ['required', Rule::in(['all', 'today', 'pending', 'assigned', 'in_progress', 'returned', 'submitted', 'completed', 'history'])],
             'batch' => ['nullable', 'string', 'max:100'], 'due' => ['nullable', 'date_format:Y-m-d'], 'query' => ['nullable', 'string', 'max:100']]);
-        $tasks = $access->scope(Task::query(), Auth::user())->with(['batch.client', 'customer', 'account', 'currentAllocation']);
+        $tasks = $access->scope(Task::query(), Auth::user())->with(['batch', 'customer', 'account', 'currentAllocation']);
         match ($this->status) {
             'today' => $tasks->whereRaw('(COALESCE(scheduled_visit_at,due_at,((SELECT due_date FROM assignment_batches WHERE id=tasks.assignment_batch_id)+1)::timestamp AT TIME ZONE ? - interval \'1 microsecond\') AT TIME ZONE ?)::date=?', [config('dcms.business_timezone'), config('dcms.business_timezone'), now()->timezone(config('dcms.business_timezone'))->toDateString()]),
             'pending' => $tasks->whereIn('work_status', ['unstarted', 'in_progress']),
@@ -78,7 +77,7 @@ class Index extends Component
             $term = trim($this->query);
             $tasks->where(fn ($q) => $q->whereHas('account', fn ($a) => $a->where('account_number', $term))->orWhereHas('customer', fn ($c) => $c->where('customer_reference', $term)));
         }
-        $history = TaskSubmission::query()->where('submitted_by', Auth::id())->whereHas('task', fn ($q) => app(TaskAccess::class)->scope($q, Auth::user()))->orderByDesc('submitted_at')->orderByDesc('id');
+        $history = TaskSubmission::query()->where('submitted_by', Auth::id())->orderByDesc('submitted_at')->orderByDesc('id');
 
         return view('livewire.rider.tasks.index', ['tasks' => $this->status === 'history' ? null : $tasks->orderByRaw('COALESCE(scheduled_visit_at,due_at) ASC NULLS LAST')->orderBy('id')->paginate(12), 'history' => $this->status === 'history' ? $history->paginate(12) : null]);
     }

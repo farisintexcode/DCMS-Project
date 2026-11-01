@@ -187,7 +187,7 @@ class Editor extends Component
     {
         $template = $this->template();
         if ($mode === 'sample') {
-            $source = ['values' => ['customer_name' => 'Sample Customer', 'account_number' => 'SAMPLE-ACCOUNT', 'company_name' => 'Sample Commissioning Client', 'outstanding_amount' => 'MYR 125.00', 'due_date' => '31 Oct 2026'], 'sources' => []];
+            $source = ['values' => ['customer_name' => 'Sample Customer', 'account_number' => 'SAMPLE-ACCOUNT', 'company_name' => 'Sample Company', 'outstanding_amount' => 'MYR 125.00', 'due_date' => '31 Oct 2026'], 'sources' => []];
         } else {
             $source = $context->values(auth()->user(), $this->customerId, $this->accountId, $this->taskId);
         }

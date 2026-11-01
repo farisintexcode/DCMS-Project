@@ -5,7 +5,6 @@ namespace App\Livewire\Admin\Verification;
 use App\Actions\Tasks\ReviewSubmission;
 use App\Models\TaskSubmission;
 use App\Services\Tasks\SubmissionEvidence;
-use App\Services\Tasks\TaskAccess;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -54,10 +53,10 @@ class Show extends Component
         session()->flash('status', 'Verification decision saved. The Rider has an in-app notification.');
     }
 
-    public function render(SubmissionEvidence $evidence, TaskAccess $access): View
+    public function render(SubmissionEvidence $evidence): View
     {
-        $submission = TaskSubmission::query()->with(['task.batch.client', 'task.account.property', 'task.customer', 'submitter', 'review.reviewer', 'documents.document'])->where('public_id', $this->submissionId)->firstOrFail();
-        abort_unless(Auth::user()->hasClientScope($submission->task->batch->client), 404);
+        $submission = TaskSubmission::query()->with(['task.batch', 'task.account.property', 'task.customer', 'submitter', 'review.reviewer', 'documents.document'])->where('public_id', $this->submissionId)->firstOrFail();
+        abort_unless(Auth::user()->isActive(), 404);
         Gate::authorize('view', $submission);
         $snapshot = $submission->completion_snapshot_ciphertext;
         $labels = collect($snapshot['lookup_labels'] ?? [])->keyBy(fn ($row) => $row['category'].'|'.$row['code']);
@@ -71,7 +70,7 @@ class Show extends Component
                 return 'Unavailable';
             }
         };
-        $pending = TaskSubmission::query()->whereDoesntHave('review')->whereHas('task', fn ($q) => $access->scope($q, Auth::user())->where('work_status', 'submitted')->where('review_status', 'pending'));
+        $pending = TaskSubmission::query()->whereDoesntHave('review')->whereHas('task', fn ($q) => $q->where('work_status', 'submitted')->where('review_status', 'pending'));
 
         return view('livewire.admin.verification.show', [
             'submission' => $submission, 'snapshot' => $snapshot, 'issues' => $evidence->issues($submission), 'referenceLabel' => $label, 'formatTime' => $formatTime,

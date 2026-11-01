@@ -22,9 +22,9 @@ class ImportTargets
             throw ValidationException::withMessages([$column => 'required']);
         }
         $query = $batch->kind === 'customer' ? Debtor::query() : AssignmentBatch::query();
-        $target = $query->where('client_id', $batch->client_id)->where($column, $reference)->first();
+        $target = $query->where($column, $reference)->first();
         $revision = $target ? ($target instanceof Debtor ? $target->revision() : $target->lock_version) : null;
-        $payload = ['input' => $values + ['client_id' => $batch->client_id], 'target_id' => $target?->id, 'revision' => $revision, 'operation' => $target ? 'update' : 'create', 'changes' => []];
+        $payload = ['input' => $values, 'target_id' => $target?->id, 'revision' => $revision, 'operation' => $target ? 'update' : 'create', 'changes' => []];
         foreach ($values as $field => $value) {
             $before = $target?->getAttribute($field === 'name' && $batch->kind === 'customer' ? 'display_name_ciphertext' : $field);
             $payload['changes'][$field] = ['before' => $this->mask($before), 'after' => $this->mask($value)];
@@ -46,7 +46,7 @@ class ImportTargets
         $target = null;
         $reference = $batch->kind === 'customer' ? 'customer_reference' : 'external_reference';
         $query = $batch->kind === 'customer' ? Debtor::query() : AssignmentBatch::query();
-        $current = $query->where('client_id', $batch->client_id)->where($reference, trim($payload['input'][$reference]))->first();
+        $current = $query->where($reference, trim($payload['input'][$reference]))->first();
         if ($payload['target_id'] === null && $current !== null) {
             throw ValidationException::withMessages(['revision' => 'target_changed']);
         }

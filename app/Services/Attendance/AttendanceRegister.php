@@ -15,13 +15,13 @@ class AttendanceRegister
 {
     public function __construct(private AttendanceAccess $access) {}
 
-    /** @return array{from:string,until:string,status:?string,rider:?string,client:?string,search:?string} */
+    /** @return array{from:string,until:string,status:?string,rider:?string,search:?string} */
     public function criteria(array $input): array
     {
         $today = now()->timezone(config('dcms.business_timezone'));
-        $criteria = Validator::make(array_merge(['from' => $today->copy()->startOfMonth()->toDateString(), 'until' => $today->toDateString(), 'status' => '', 'rider' => '', 'client' => '', 'search' => ''], $input), [
+        $criteria = Validator::make(array_merge(['from' => $today->copy()->startOfMonth()->toDateString(), 'until' => $today->toDateString(), 'status' => '', 'rider' => '', 'search' => ''], $input), [
             'from' => ['required', 'date_format:Y-m-d'], 'until' => ['required', 'date_format:Y-m-d', 'after_or_equal:from'],
-            'status' => ['nullable', Rule::in(array_keys(AttendanceStatus::LABELS))], 'rider' => ['nullable', 'uuid'], 'client' => ['nullable', 'uuid'], 'search' => ['nullable', 'string', 'max:100'],
+            'status' => ['nullable', Rule::in(array_keys(AttendanceStatus::LABELS))], 'rider' => ['nullable', 'uuid'], 'search' => ['nullable', 'string', 'max:100'],
         ])->validate();
         if (CarbonImmutable::parse($criteria['from'])->diffInDays(CarbonImmutable::parse($criteria['until'])) > 366) {
             throw ValidationException::withMessages(['until' => 'Choose a range of up to one year.']);
@@ -34,7 +34,7 @@ class AttendanceRegister
     public function query(User $actor, array $criteria, bool $own = false, ?CarbonImmutable $asOf = null): Builder
     {
         $c = $this->criteria($criteria);
-        $riders = $own ? Staff::query()->whereKey($actor->staff_id) : $this->access->riders($actor, $c['client'] ?: null);
+        $riders = $own ? Staff::query()->whereKey($actor->staff_id) : $this->access->riders($actor);
         $riders->when($c['rider'] !== '', fn ($q) => $q->where('public_id', $c['rider']));
         if (trim($c['search']) !== '') {
             $prefix = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], trim($c['search'])).'%';

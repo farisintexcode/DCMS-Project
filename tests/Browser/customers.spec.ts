@@ -3,7 +3,7 @@ import { expect, test } from './fixtures';
 test('customer categories create edit search and history work on desktop and small screens', async ({ page }) => {
     const email = process.env.DCMS_E2E_ADMIN_EMAIL;
     const password = process.env.DCMS_E2E_PASSWORD;
-    test.skip(!email || !password, 'Provision isolated synthetic Admin/client fixtures.');
+    test.skip(!email || !password, 'Provision isolated synthetic Admin fixtures.');
     test.setTimeout(90000);
     const suffix = test.info().project.name;
     const reference = `E2E-${suffix}`;
@@ -15,13 +15,11 @@ test('customer categories create edit search and history work on desktop and sma
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
     await expect(page).toHaveURL(/\/admin$/, { timeout: 90000 });
     await page.goto('/admin/customers/categories');
-    await page.getByLabel('Client', { exact: true }).selectOption({ label: 'Synthetic Client' });
     await page.getByLabel('Category code', { exact: true }).fill(category);
     await page.getByLabel('Category name', { exact: true }).fill(category);
     await page.getByRole('button', { name: 'Save category', exact: true }).click();
     await expect(page.getByRole('heading', { name: category, exact: true })).toBeVisible();
     await page.goto('/admin/customers/create');
-    await page.getByLabel('Client', { exact: true }).selectOption({ label: 'Synthetic Client' });
     await page.getByLabel('Customer reference', { exact: true }).fill(reference);
     await page.getByLabel('Customer name', { exact: true }).fill(`Aisyah ${suffix}`);
     await page.getByLabel('Identifier (optional)', { exact: true }).fill(identifier);
@@ -56,7 +54,6 @@ test('customer categories create edit search and history work on desktop and sma
     await page.getByLabel('Search customers', { exact: true }).fill('Ais');
     await searchResponse;
     await expect(page.getByText('Loading customers…', { exact: true })).toBeHidden();
-    await expect(page.getByText('Foreign client customer', { exact: true })).toHaveCount(0);
     await expect(page.getByText(`Updated Aisyah ${suffix}`, { exact: true }).filter({ visible: true }).first()).toBeVisible();
     await expect(page.locator('main')).toContainText(reference);
     await page.screenshot({ path: test.info().outputPath('customer-list.png'), fullPage: true });
