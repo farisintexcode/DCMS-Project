@@ -6,8 +6,6 @@ use App\Actions\Tasks\ReviewSubmission;
 use App\Models\AssignmentBatch;
 use App\Models\Staff;
 use App\Models\TaskSubmission;
-use App\Services\ClientAccess;
-use App\Services\Tasks\TaskAccess;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -88,10 +86,10 @@ class Index extends Component
         session()->flash('status', 'Verification committed for '.count($this->results).' selected submission(s).');
     }
 
-    public function render(TaskAccess $access): View
+    public function render(): View
     {
         Gate::authorize('viewAny', TaskSubmission::class);
-        $query = TaskSubmission::query()->whereHas('task', fn ($q) => $access->scope($q, Auth::user()))->with(['task.batch', 'task.customer', 'submitter', 'review']);
+        $query = TaskSubmission::query()->with(['task.batch', 'task.customer', 'submitter', 'review']);
         match ($this->status) {
             'pending' => $query->whereDoesntHave('review')->whereHas('task', fn ($q) => $q->where('work_status', 'submitted')->where('review_status', 'pending')),
             'approved','returned' => $query->whereHas('review', fn ($q) => $q->where('decision', $this->status)),
@@ -123,8 +121,8 @@ class Index extends Component
 
         return view('livewire.admin.verification.index', [
             'submissions' => $query->orderByDesc('submitted_at')->orderByDesc('id')->paginate(20), 'dateError' => $dates->fails() ? 'Choose a valid submission date range (MYT).' : null,
-            'batches' => app(ClientAccess::class)->scope(AssignmentBatch::query(), Auth::user())->orderByDesc('id')->limit(200)->get(),
-            'riders' => Staff::query()->whereHas('user', fn ($u) => $u->whereIn('id', TaskSubmission::query()->whereHas('task', fn ($t) => $access->scope($t, Auth::user()))->select('submitted_by')))->orderBy('first_name')->limit(200)->get(),
+            'batches' => AssignmentBatch::query()->orderByDesc('id')->limit(200)->get(),
+            'riders' => Staff::query()->whereHas('user', fn ($u) => $u->whereIn('id', TaskSubmission::query()->select('submitted_by')))->orderBy('first_name')->limit(200)->get(),
         ]);
     }
 }

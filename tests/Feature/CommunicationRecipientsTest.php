@@ -14,7 +14,6 @@ use App\Models\Contact;
 use App\Models\Conversation;
 use App\Models\Task;
 use App\Models\User;
-use App\Models\UserClientScope;
 use App\Services\Communications\EmailEligibility;
 use App\Services\Customers\CustomerSearch;
 use Database\Seeders\DatabaseSeeder;
@@ -37,8 +36,6 @@ function recipientFixture(): array
     $actor = User::factory()->create();
     $actor->assignRole('Admin');
     $actor->givePermissionTo(['templates.approve', 'communication-permission.create', 'communication-permission.update', 'communication-permission.block', 'communication-permission.approve', 'communication-permission.override']);
-    $scope = new UserClientScope;
-    $scope->forceFill(['user_id' => $actor->id, 'client_id' => $task->batch->client_id, 'granted_by' => $actor->id, 'valid_from' => now()->subMinute(), 'reason' => 'Synthetic email portfolio'])->save();
     $email = 'recipient@example.test';
     $contact = Contact::factory()->create(['debtor_id' => $task->customer_id, 'kind_code' => 'email', 'value_ciphertext' => $email, 'value_fingerprint' => app(CustomerSearch::class)->token('contact:email', $email)]);
 
@@ -46,7 +43,7 @@ function recipientFixture(): array
 }
 function permissionInput(Task $task, Contact $contact, array $extra = []): array
 {
-    return array_replace(['state' => 'allowed', 'basis' => 'EXISTING_ACCOUNT_RELATIONSHIP', 'contact' => $contact->public_id, 'account' => $task->account->public_id, 'source' => 'Synthetic reviewed client record', 'reference' => 'TEST-AUTHORITY', 'email_source' => 'Synthetic client contact', 'reason' => 'Synthetic service-account authority'], $extra);
+    return array_replace(['state' => 'allowed', 'basis' => 'EXISTING_ACCOUNT_RELATIONSHIP', 'contact' => $contact->public_id, 'account' => $task->account->public_id, 'source' => 'Synthetic reviewed customer record', 'reference' => 'TEST-AUTHORITY', 'email_source' => 'Synthetic customer contact', 'reason' => 'Synthetic service-account authority'], $extra);
 }
 function allowedRecipient(User $actor, Task $task, Contact $contact): CommunicationPreference
 {
@@ -66,7 +63,7 @@ function recipientTemplate(User $actor): CommunicationTemplate
 }
 function recipientSelection(Task $task, Contact $contact, CommunicationTemplate $template, array $extra = []): array
 {
-    return array_replace(['client' => $task->batch->client->public_id, 'template' => $template->public_id, 'mode' => 'single', 'rows' => [['contact' => $contact->public_id, 'account' => $task->account->public_id]]], $extra);
+    return array_replace(['template' => $template->public_id, 'mode' => 'single', 'rows' => [['contact' => $contact->public_id, 'account' => $task->account->public_id]]], $extra);
 }
 
 test('recipient workspace enforces administrative access scope and reserved policy grants', function (): void {
@@ -113,7 +110,7 @@ test('stop requests suppress immediately and changing blocked authority requires
 test('explicit consent and collection authority require their evidence before review', function (array $extra): void {
     [$actor,$task,$contact] = recipientFixture();
     expect(fn () => app(ManagePreferences::class)->request($actor, $task->customer->public_id, permissionInput($task, $contact, $extra), (string) Str::uuid7()))->toThrow(ValidationException::class);
-})->with([[['basis' => 'EXPLICIT_SERVICE_CONSENT']], [['basis' => 'CLIENT_AUTHORIZED_COLLECTION']], [['source' => '   ']], [['state' => 'allowed', 'account' => '']]]);
+})->with([[['basis' => 'EXPLICIT_SERVICE_CONSENT']], [['basis' => 'AUTHORIZED_COLLECTION']], [['source' => '   ']], [['state' => 'allowed', 'account' => '']]]);
 
 test('preview freezes personalized recipient data reconciles counts and never sends email', function (): void {
     Mail::fake();
@@ -173,15 +170,11 @@ test('new restriction makes a preview stale while original content and decisions
     expect($batch->refresh()->status)->toBe('cancelled')->and($message->refresh()->delivery_status)->toBe('cancelled')->and($message->body_ciphertext)->toContain($task->customer->display_name_ciphertext);
 });
 
-test('foreign contacts and revoked client access cannot create or read previews', function (): void {
+test('unknown contacts cannot create previews', function (): void {
     [$actor,$task,$contact] = recipientFixture();
     $template = recipientTemplate($actor);
-    $foreign = Contact::factory()->create();
-    $input = recipientSelection($task, $contact, $template, ['rows' => [['contact' => $foreign->public_id]]]);
+    $input = recipientSelection($task, $contact, $template, ['rows' => [['contact' => (string) Str::uuid7()]]]);
     expect(fn () => app(PreviewRecipients::class)->create($actor, $input, (string) Str::uuid7()))->toThrow(HttpException::class);
-    $batch = app(PreviewRecipients::class)->create($actor, recipientSelection($task, $contact, $template), (string) Str::uuid7());
-    UserClientScope::query()->where('user_id', $actor->id)->update(['valid_to' => now()]);
-    $this->actingAs($actor)->get(route('admin.communications.batches.show', $batch))->assertNotFound();
 });
 
 test('permission lineage and conversation contacts cannot cross customer boundaries', function (): void {
@@ -202,7 +195,7 @@ test('recipient components expose validation and preserve the reviewed preview w
         ->set('reviewReasons.'.$pref->public_id, 'Synthetic reviewed evidence')->call('review', $pref->public_id, 'approved', 0)->assertHasNoErrors();
     $template = recipientTemplate($actor);
     Livewire\Livewire::test(Recipients::class)
-        ->set('client', $task->batch->client->public_id)->set('template', $template->public_id)
+        ->set('template', $template->public_id)
         ->set('selected', [$contact->public_id])->set('contexts', [$contact->public_id => ['account' => $task->account->public_id]])
         ->call('savePreview')->assertHasNoErrors()->assertRedirect();
     $batch = CommunicationBatch::query()->firstOrFail();

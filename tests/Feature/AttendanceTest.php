@@ -9,10 +9,8 @@ use App\Models\AttendanceAdjustment;
 use App\Models\AttendancePolicy;
 use App\Models\AttendanceSchedule;
 use App\Models\AuditLog;
-use App\Models\Client;
 use App\Models\Staff;
 use App\Models\User;
-use App\Models\UserClientScope;
 use App\Services\Attendance\AttendanceRegister;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DatabaseSeeder;
@@ -36,19 +34,14 @@ function attendanceFixture(array $overrides = []): array
     $admin->assignRole('Admin');
     $rider = User::factory()->for(Staff::factory())->create();
     $rider->assignRole('Rider');
-    $client = Client::factory()->create();
-    foreach ([$admin, $rider] as $user) {
-        $scope = new UserClientScope;
-        $scope->forceFill(['user_id' => $user->id, 'client_id' => $client->id, 'granted_by' => $admin->id, 'reason' => 'Synthetic attendance scope', 'valid_from' => now()->subDay()])->save();
-    }
     $policy = app(ConfigureAttendance::class)->policy($admin, ['code' => 'fixture-'.Str::lower(Str::random(8)), 'rules' => array_replace(config('attendance.initial_rules'), $overrides)]);
     [$start,$end] = app(ConfigureAttendance::class)->times(now()->timezone(config('dcms.business_timezone'))->toDateString(), $policy->rules);
     $schedule = AttendanceSchedule::factory()->create(['rider_id' => $rider->staff_id, 'policy_id' => $policy->id, 'authorized_by' => $admin->id, 'scheduled_start_at' => $start, 'scheduled_end_at' => $end]);
 
-    return [$admin, $rider, $schedule, $client];
+    return [$admin, $rider, $schedule];
 }
 
-test('attendance routes enforce authentication grants and client scope while own history stays personal', function (): void {
+test('attendance routes enforce authentication and grants while own history stays personal', function (): void {
     $this->travelTo(CarbonImmutable::parse('2026-10-19 09:00:00', 'Asia/Kuala_Lumpur'));
     [$admin,$rider,$schedule] = attendanceFixture();
     $this->get(route('rider.attendance'))->assertRedirect(route('rider.login'));
@@ -56,9 +49,6 @@ test('attendance routes enforce authentication grants and client scope while own
     $this->get(route('rider.attendance'))->assertOk()->assertSee('Your attendance');
     $this->actingAs($admin)->get(route('admin.attendance.index'))->assertOk()->assertSee('Attendance');
     $this->get(route('admin.attendance.show', $schedule))->assertOk();
-    $foreign = User::factory()->create();
-    $foreign->assignRole('Admin');
-    $this->actingAs($foreign)->get(route('admin.attendance.show', $schedule))->assertNotFound();
 });
 
 test('server punches are idempotent and one shift cannot be duplicated or manually overwritten', function (): void {
@@ -162,8 +152,6 @@ test('stale corrections cannot overwrite a later punch and rejected correction r
     $checker = User::factory()->create();
     $checker->assignRole('Admin');
     $checker->givePermissionTo('attendance.approve_correction');
-    $scope = new UserClientScope;
-    $scope->forceFill(['user_id' => $checker->id, 'client_id' => $schedule->rider->user->clientScopes()->value('client_id'), 'granted_by' => $admin->id, 'valid_from' => now()->subMinute(), 'reason' => 'Synthetic checker'])->save();
     app(ClockAttendance::class)->punch($rider, 'out', (string) Str::uuid7(), $punch->public_id, 0);
     expect(fn () => $correct->review($checker, $request, 'approved', 'Check'))->toThrow(ValidationException::class);
     $correct->review($checker, $request, 'rejected', 'Actual clock out already recorded.');
@@ -236,21 +224,19 @@ test('unscheduled punches stay needs review until an approved calendar link and 
     expect(app(AttendanceRegister::class)->query($admin, ['from' => '2026-10-20', 'until' => '2026-10-20'])->count())->toBe(1);
 });
 
-test('exports reuse private filters escape formulas and cannot disclose other client attendance', function (): void {
+test('exports reuse private filters and escape formulas', function (): void {
     $this->travelTo(CarbonImmutable::parse('2026-10-19 09:00', 'Asia/Kuala_Lumpur'));
     [$admin,$rider,$schedule] = attendanceFixture();
-    [$other,$foreign] = attendanceFixture();
     $rider->staff->forceFill(['first_name' => '=Formula', 'last_name' => 'Test'])->save();
-    $foreign->staff->forceFill(['first_name' => 'ForeignSecret'])->save();
     $this->actingAs($admin)->withSession(['attendance.filters.'.$admin->id => ['from' => '2026-10-19', 'until' => '2026-10-19']]);
     $csv = $this->get(route('admin.attendance.export', ['format' => 'csv']))->assertOk()->assertHeader('X-Content-Type-Options', 'nosniff')->streamedContent();
-    expect($csv)->toContain("'=Formula Test")->not->toContain('ForeignSecret');
-    $this->get(route('admin.attendance.export', ['format' => 'print']))->assertOk()->assertSee('Attendance report')->assertDontSee('ForeignSecret');
+    expect($csv)->toContain("'=Formula Test");
+    $this->get(route('admin.attendance.export', ['format' => 'print']))->assertOk()->assertSee('Attendance report');
     $rider->givePermissionTo('attendance.export');
     $this->actingAs($rider)->get(route('admin.attendance.export', ['format' => 'csv']))->assertForbidden();
 });
 
-test('Livewire own punches and correction requests recheck current permissions and remain scoped after grant expiry', function (): void {
+test('Livewire own punches and correction requests recheck current permissions', function (): void {
     $this->travelTo(CarbonImmutable::parse('2026-10-19 09:00', 'Asia/Kuala_Lumpur'));
     [$admin,$rider,$schedule] = attendanceFixture();
     $component = Livewire::actingAs($rider)->test(App\Livewire\Rider\Attendance::class)->call('clock', 'in')->assertHasNoErrors()->assertSee('Open shift');
@@ -258,8 +244,6 @@ test('Livewire own punches and correction requests recheck current permissions a
     $component->call('clock', 'out')->assertForbidden();
     expect(Attendance::query()->firstOrFail()->raw_clock_out_at)->toBeNull();
     $rider->assignRole('Rider');
-    $rider->clientScopes()->update(['valid_to' => now()]);
-    expect(app(AttendanceRegister::class)->query($admin, [])->count())->toBe(0);
     $this->actingAs($rider)->get(route('rider.attendance'))->assertOk()->assertSee('Your attendance');
 });
 
@@ -315,8 +299,6 @@ test('an independently approved planned-shift correction preserves the previous 
     $checker = User::factory()->create();
     $checker->assignRole('Admin');
     $checker->givePermissionTo('attendance.approve_correction');
-    $scope = new UserClientScope;
-    $scope->forceFill(['user_id' => $checker->id, 'client_id' => $schedule->rider->user->clientScopes()->value('client_id'), 'granted_by' => $admin->id, 'valid_from' => now()->subMinute(), 'reason' => 'Synthetic checker'])->save();
     $correct->review($checker, $request, 'approved', 'Changed shift checked');
     expect($punch->refresh()->is_late)->toBeFalse()->and($punch->worked_minutes)->toBe(480)->and($schedule->refresh()->scheduled_start_at->format('H:i'))->toBe('02:00')
         ->and($request->refresh()->before_values['scheduled_start_at'])->toBe('2026-10-19T01:00:00.000000Z');
@@ -325,7 +307,7 @@ test('an independently approved planned-shift correction preserves the previous 
 test('malformed attendance filters and calendar identifiers return usable validation instead of database errors', function (): void {
     $this->travelTo(CarbonImmutable::parse('2026-10-19 09:00', 'Asia/Kuala_Lumpur'));
     [$admin,$rider,$schedule] = attendanceFixture();
-    $this->actingAs($admin)->get(route('admin.attendance.index', ['client' => 'not-a-uuid', 'from' => 'not-a-date']))->assertOk()->assertSee('format Y-m-d');
+    $this->actingAs($admin)->get(route('admin.attendance.index', ['from' => 'not-a-date']))->assertOk()->assertSee('format Y-m-d');
     Livewire::actingAs($admin)->test(Configuration::class)->set('riderId', 'invalid')->set('policyId', 'invalid')->call('assign')->assertHasErrors(['riderId', 'policyId']);
     expect(AttendanceSchedule::query()->count())->toBe(1);
 });

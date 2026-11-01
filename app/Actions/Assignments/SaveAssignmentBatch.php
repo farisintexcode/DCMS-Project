@@ -4,7 +4,6 @@ namespace App\Actions\Assignments;
 
 use App\Enums\BatchStatus;
 use App\Models\AssignmentBatch;
-use App\Models\Client;
 use App\Models\User;
 use App\Services\Assignments\BatchWork;
 use App\Services\AuditWriter;
@@ -25,19 +24,14 @@ class SaveAssignmentBatch
     {
         try {
             return DB::transaction(function () use ($actor, $input, $existing, $version, $initialStatus): AssignmentBatch {
-                $clientId = $existing?->client_id ?? (is_scalar($input['client_id'] ?? null) ? filter_var($input['client_id'], FILTER_VALIDATE_INT) : 0);
-                $client = Client::query()->lockForUpdate()->findOrFail($clientId ?: 0);
-                abort_unless($actor->hasClientScope($client), 404);
+                abort_unless($actor->isActive(), 404);
                 $batch = $existing ? AssignmentBatch::query()->lockForUpdate()->findOrFail($existing->id) : new AssignmentBatch;
-                Gate::forUser($actor)->authorize($existing ? 'update' : 'create', $existing ? $batch : [AssignmentBatch::class, $client]);
+                Gate::forUser($actor)->authorize($existing ? 'update' : 'create', $existing ? $batch : AssignmentBatch::class);
                 if ($existing && ($version === null || $batch->lock_version !== $version)) {
                     throw ValidationException::withMessages(['version' => 'This assignment changed. Reload and review before saving.']);
                 }
                 if ($existing && $batch->status !== BatchStatus::Active) {
                     throw ValidationException::withMessages(['status' => 'Archived assignments are read-only. Reopen under authorization first.']);
-                }
-                if (isset($input['client_id']) && (! is_scalar($input['client_id']) || (string) $input['client_id'] !== (string) $client->id)) {
-                    throw ValidationException::withMessages(['data.client_id' => 'The assignment client cannot be changed.']);
                 }
                 foreach (['name', 'external_reference', 'description', 'dca_code', 'dca_name', 'la_name', 'state_code'] as $field) {
                     if (is_string($input[$field] ?? null)) {
@@ -49,7 +43,7 @@ class SaveAssignmentBatch
                 }
                 $rules = [
                     'name' => ['required', 'string', 'max:200'],
-                    'external_reference' => ['nullable', 'string', 'max:100', Rule::unique('assignment_batches')->where('client_id', $client->id)->ignore($batch->id)],
+                    'external_reference' => ['nullable', 'string', 'max:100', Rule::unique('assignment_batches')->ignore($batch->id)],
                     'start_date' => ['required', 'date_format:Y-m-d'],
                     'due_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:start_date'],
                     'description' => ['nullable', 'string', 'max:5000'],
@@ -75,7 +69,6 @@ class SaveAssignmentBatch
                 foreach ($data as $field => $value) {
                     $batch->{$field} = $value;
                 }
-                $batch->client_id = $client->id;
                 if (! $existing) {
                     $batch->created_by = $actor->id;
                     $batch->status = BatchStatus::from($initialStatus);
@@ -90,7 +83,7 @@ class SaveAssignmentBatch
                 return $batch->refresh();
             }, 3);
         } catch (UniqueConstraintViolationException) {
-            throw ValidationException::withMessages(['data.external_reference' => 'This client already has an assignment with that external reference.']);
+            throw ValidationException::withMessages(['data.external_reference' => 'An assignment with that external reference already exists.']);
         }
     }
 }

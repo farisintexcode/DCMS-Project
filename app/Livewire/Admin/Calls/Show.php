@@ -112,7 +112,7 @@ class Show extends Component
     {
         $customer = $this->customer();
         $canTasks = Gate::allows('viewAny', Task::class);
-        $tasks = $canTasks ? Task::query()->where('customer_id', $customer->id)->with(['batch.client', 'account', 'currentAllocation.collector'])->orderByDesc('id')->limit(100)->get() : collect();
+        $tasks = $canTasks ? Task::query()->where('customer_id', $customer->id)->with(['batch', 'account', 'currentAllocation.collector'])->orderByDesc('id')->limit(100)->get() : collect();
 
         return view('livewire.admin.calls.show', [
             'customer' => $customer, 'canTasks' => $canTasks, 'tasks' => $tasks,

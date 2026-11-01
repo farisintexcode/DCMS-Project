@@ -4,7 +4,6 @@ namespace App\Actions\Tasks;
 
 use App\Enums\BatchStatus;
 use App\Models\AssignmentBatch;
-use App\Models\Client;
 use App\Models\Task;
 use App\Models\TaskReview;
 use App\Models\TaskStatusHistory;
@@ -13,7 +12,6 @@ use App\Models\User;
 use App\Notifications\TaskReviewed;
 use App\Services\AuditWriter;
 use App\Services\Tasks\SubmissionEvidence;
-use App\Services\Tasks\TaskAccess;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -65,7 +63,6 @@ class ReviewSubmission
         return DB::transaction(function () use ($actor, $preview): array {
             $references = array_column($preview['selection'], 'submission');
             $records = $this->records($actor, $references);
-            Client::query()->whereIn('id', $records->map(fn ($s) => $s->task->batch->client_id)->unique())->orderBy('id')->lockForUpdate()->get();
             AssignmentBatch::query()->whereIn('id', $records->map(fn ($s) => $s->task->assignment_batch_id)->unique())->orderBy('id')->lockForUpdate()->get();
             Task::query()->whereIn('id', $records->pluck('task_id')->unique())->orderBy('id')->lockForUpdate()->get();
             TaskSubmission::query()->whereIn('id', $records->pluck('id'))->orderBy('id')->lockForUpdate()->get();
@@ -135,8 +132,8 @@ class ReviewSubmission
 
     private function records(User $actor, array $references): Collection
     {
-        return TaskSubmission::query()->whereIn('public_id', $references)->whereHas('task', fn ($q) => app(TaskAccess::class)->scope($q, $actor))
-            ->with(['task.batch.client', 'task.currentAllocation', 'review', 'documents.document'])->get();
+        return TaskSubmission::query()->whereIn('public_id', $references)
+            ->with(['task.batch', 'task.currentAllocation', 'review', 'documents.document'])->get();
     }
 
     private function issues(User $actor, TaskSubmission $submission, string $decision): array
@@ -161,7 +158,7 @@ class ReviewSubmission
         }
         if ($decision === 'returned') {
             $recipient = $task->currentAllocation ? User::query()->where('staff_id', $task->currentAllocation->collector_id)->first() : null;
-            if (! $recipient || ! $recipient->canUseRiderInterface() || ! $recipient->can('tasks.view') || ! $recipient->can('tasks.submit') || ! $recipient->hasClientScope($task->batch->client)) {
+            if (! $recipient || ! $recipient->canUseRiderInterface() || ! $recipient->can('tasks.view') || ! $recipient->can('tasks.submit')) {
                 $issues['rider'] = 'The current Rider needs active task access to receive a correction.';
             }
         }

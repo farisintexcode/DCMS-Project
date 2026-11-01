@@ -13,6 +13,6 @@
 <div class="rider-card-grid">@forelse($history as $submission)<a href="{{ route('rider.tasks.history',$submission) }}" class="surface rider-receipt-card"><span class="rider-record-icon"><x-icon name="shield" /></span><div class="min-w-0"><h2>Submission {{ $submission->submission_version }}</h2><p class="mt-1 break-all text-[11px] text-ink-500">{{ $submission->public_id }}</p><time class="mt-2 block text-xs">{{ $submission->submitted_at->timezone(config('dcms.business_timezone'))->format('d M Y · H:i') }} MYT</time></div><x-icon name="chevron" class="size-4" /></a>@empty<div class="md:col-span-2"><x-empty-state title="No submission history" message="Your submitted work will appear here." icon="shield" /></div>@endforelse</div>{{ $history->links() }}
 @else
 <div class="rider-section-heading"><h2>{{ $status==='pending'?'Your pending work':'Tasks in this view' }}</h2><span>{{ $tasks->total() }} {{ $tasks->total()===1?'task':'tasks' }}</span></div>
-<div class="rider-card-grid">@forelse($tasks as $task)<x-rider.task-card :task="$task" />@empty<div class="md:col-span-2"><x-empty-state title="No tasks in this view" message="Try another filter. Your Admin assigns work and client access." icon="clipboard" /></div>@endforelse</div>{{ $tasks->links() }}
+<div class="rider-card-grid">@forelse($tasks as $task)<x-rider.task-card :task="$task" />@empty<div class="md:col-span-2"><x-empty-state title="No tasks in this view" message="Try another filter. Your Admin assigns work." icon="clipboard" /></div>@endforelse</div>{{ $tasks->links() }}
 @endif
 </section>

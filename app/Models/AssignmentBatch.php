@@ -24,11 +24,6 @@ class AssignmentBatch extends Model
         return ['start_date' => 'date', 'due_date' => 'date', 'archived_at' => 'immutable_datetime', 'lock_version' => 'integer', 'status' => BatchStatus::class];
     }
 
-    public function client(): BelongsTo
-    {
-        return $this->belongsTo(Client::class);
-    }
-
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');

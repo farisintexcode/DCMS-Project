@@ -12,7 +12,6 @@ use App\Models\Staff;
 use App\Models\Task;
 use App\Models\TaskAllocation;
 use App\Models\User;
-use App\Models\UserClientScope;
 use App\Services\Tasks\CompletionChecklist;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
@@ -34,7 +33,6 @@ function batchFlowFixture(int $count = 2): array
     $first = Task::factory()->create();
     $actor = User::factory()->for(Staff::factory()->create())->create();
     $actor->assignRole('Rider');
-    UserClientScope::unguarded(fn () => UserClientScope::query()->create(['user_id' => $actor->id, 'client_id' => $first->batch->client_id, 'granted_by' => $actor->id, 'valid_from' => now()->subMinute(), 'reason' => 'Synthetic Rider batch scope']));
     $tasks = collect([$first]);
     for ($index = 1; $index < $count; $index++) {
         $tasks->push(Task::factory()->create(['assignment_batch_id' => $first->assignment_batch_id, 'debt_account_id' => $first->debt_account_id, 'customer_id' => $first->customer_id, 'type_code' => $first->type_code]));
@@ -75,12 +73,12 @@ test('Rider batch updates preserve previous observations and exact task selectio
     expect(fn () => $updates->apply($actor, $preview))->toThrow(ValidationException::class);
 });
 
-test('a stale task or revoked client scope blocks the entire batch', function (string $change): void {
+test('a stale task or revoked permission blocks the entire batch', function (string $change): void {
     [$actor, $batch, $tasks] = batchFlowFixture();
     $updates = app(RiderBatchUpdate::class);
     $preview = $updates->preview($actor, $batch, batchFlowInput($tasks));
-    if ($change === 'scope') {
-        UserClientScope::query()->where('user_id', $actor->id)->update(['valid_to' => now()]);
+    if ($change === 'permission') {
+        $actor->syncRoles([]);
     } else {
         $tasks[1]->increment('lock_version');
     }
@@ -90,7 +88,7 @@ test('a stale task or revoked client scope blocks the entire batch', function (s
     } catch (ValidationException|HttpException) {
         expect(PropertyInspection::query()->count())->toBe(0);
     }
-})->with(['scope', 'version']);
+})->with(['permission', 'version']);
 
 test('preview rejects unavailable selections and inactive lookup values', function (): void {
     [$actor, $batch, $tasks] = batchFlowFixture();

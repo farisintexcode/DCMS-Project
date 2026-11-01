@@ -29,7 +29,7 @@ function invitationToken(User $account): string
     return basename(parse_url($notification->toMail($account)->actionUrl, PHP_URL_PATH));
 }
 
-test('authorized Rider invitation creates only the selected role no scope and a single-use activation', function (): void {
+test('authorized Rider invitation creates only the selected role and a single-use activation', function (): void {
     $actor = staffManager();
     $actor->givePermissionTo('users.invite');
     $staff = app(SaveStaff::class)->handle($actor, staffInput());
@@ -39,7 +39,7 @@ test('authorized Rider invitation creates only the selected role no scope and a 
     $account = $staff->user()->firstOrFail();
     expect($status)->toBe('local_capture')->and($account->status)->toBe(AccountStatus::Invited)
         ->and($account->hasRole('Rider'))->toBeTrue()->and($account->can('admin.access'))->toBeFalse()
-        ->and($account->clientScopes()->count())->toBe(0)->and($account->isActive())->toBeFalse();
+        ->and($account->isActive())->toBeFalse();
     Notification::assertSentTo($account, StaffInvitation::class);
     $invitationMail = Notification::sent($account, StaffInvitation::class)->last()->toMail($account);
     expect($invitationMail->subject)->toBe('Activate your Nexora staff account');
@@ -72,7 +72,7 @@ test('explicit Admin invitation requires role authority and never infers access 
     app(InviteStaffAccount::class)->handle($actor, $staff, 'Admin', $staff->revision());
 
     $account = $staff->user()->firstOrFail();
-    expect($account->hasRole('Admin'))->toBeTrue()->and($account->can('roles.manage'))->toBeFalse()->and($account->clientScopes()->count())->toBe(0);
+    expect($account->hasRole('Admin'))->toBeTrue()->and($account->can('roles.manage'))->toBeFalse();
 });
 
 test('inactive staff missing email and ineligible Rider cannot be invited', function (array $changes): void {

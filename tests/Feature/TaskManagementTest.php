@@ -12,7 +12,6 @@ use App\Models\AccountParty;
 use App\Models\AssignmentBatch;
 use App\Models\BulkOperation;
 use App\Models\BulkOperationItem;
-use App\Models\Client;
 use App\Models\DebtAccount;
 use App\Models\Debtor;
 use App\Models\OutboxEvent;
@@ -21,10 +20,8 @@ use App\Models\Staff;
 use App\Models\Task;
 use App\Models\TaskAllocation;
 use App\Models\User;
-use App\Models\UserClientScope;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -40,24 +37,22 @@ beforeEach(function (): void {
 });
 function taskContext(): array
 {
-    [$actor,$client] = customerOperator();
-    $customer = Debtor::factory()->for($client)->create();
+    $actor = staffManager();
+    $customer = Debtor::factory()->create();
     $account = app(SaveDebtAccount::class)->handle($actor, $customer, ['account_number' => '000123', 'billing_reference' => 'B001', 'currency' => 'MYR', 'status' => 'active', 'role_code' => 'billing_customer', 'address' => '10 Synthetic Road', 'postcode' => '00001']);
-    $batch = AssignmentBatch::factory()->for($client)->create();
+    $batch = AssignmentBatch::factory()->create();
 
-    return [$actor, $client, $customer, $account, $batch];
+    return [$actor, $customer, $account, $batch];
 }
 function taskInput(AssignmentBatch $batch, DebtAccount $account, Debtor $customer, array $changes = []): array
 {
     return $changes + ['assignment_batch_id' => $batch->id, 'debt_account_id' => $account->id, 'customer_id' => $customer->id, 'priority_code' => 'normal', 'scheduled_visit_at' => '2026-10-20T09:30', 'due_at' => '2026-10-21T17:30', 'instructions' => 'Synthetic private instructions'];
 }
-function scopedRider(Client $client): Staff
+function eligibleRider(): Staff
 {
     $staff = Staff::factory()->create(['is_active' => true, 'is_rider' => true]);
     $user = User::factory()->for($staff)->create();
     $user->assignRole('Rider');
-    $scope = new UserClientScope;
-    $scope->forceFill(['user_id' => $user->id, 'client_id' => $client->id, 'granted_by' => $user->id, 'reason' => 'Synthetic field portfolio', 'valid_from' => now()->subMinute()])->save();
 
     return $staff;
 }
@@ -67,7 +62,7 @@ function taskPreview(User $actor, Task $task, string $operation, ?Staff $rider =
 }
 
 test('manual task preserves source identity encrypts instructions normalizes timezone and writes history atomically', function (): void {
-    [$actor,$client,$customer,$account,$batch] = taskContext();
+    [$actor,$customer,$account,$batch] = taskContext();
     $task = app(SaveTask::class)->handle($actor, taskInput($batch, $account, $customer, ['work_status' => 'completed', 'source_iwk_id' => 'FAKE', 'created_by' => 99999]));
     expect($task->origin_code)->toBe('manual')->and($task->source_iwk_id)->toBeNull()->and($task->work_status)->toBe('unstarted')->and($task->created_by)->toBe($actor->id)->and($task->scheduled_visit_at->format('H:i'))->toBe('01:30')->and($task->history()->count())->toBe(1);
     expect(DB::table('tasks')->value('special_instruction_ciphertext'))->not->toContain('Synthetic private');
@@ -76,7 +71,7 @@ test('manual task preserves source identity encrypts instructions normalizes tim
 });
 
 test('task metadata edits reject stale versions preserve original snapshots and disallow direct completion', function (): void {
-    [$actor,$client,$customer,$account,$batch] = taskContext();
+    [$actor,$customer,$account,$batch] = taskContext();
     $input = taskInput($batch, $account, $customer);
     $task = app(SaveTask::class)->handle($actor, $input);
     $snapshot = $task->getRawOriginal('source_snapshot_ciphertext');
@@ -87,7 +82,7 @@ test('task metadata edits reject stale versions preserve original snapshots and 
 });
 
 test('account role changes retain history and do not merge properties by address', function (): void {
-    [$actor,$client,$customer,$account,$batch] = taskContext();
+    [$actor,$customer,$account,$batch] = taskContext();
     $old = $account->parties()->firstOrFail();
     $account = app(SaveDebtAccount::class)->handle($actor, $customer, ['account_number' => '000123', 'currency' => 'MYR', 'status' => 'active', 'role_code' => 'owner', 'address' => '10 Synthetic Road'], $account, $account->revision());
     expect($old->refresh()->valid_to)->not->toBeNull()->and($account->parties()->count())->toBe(2);
@@ -95,10 +90,10 @@ test('account role changes retain history and do not merge properties by address
 });
 
 test('new replace reassign unassign and cancellation preserve allocation and task history on replay', function (): void {
-    [$actor,$client,$customer,$account,$batch] = taskContext();
+    [$actor,$customer,$account,$batch] = taskContext();
     $task = app(SaveTask::class)->handle($actor, taskInput($batch, $account, $customer));
-    $one = scopedRider($client);
-    $two = scopedRider($client);
+    $one = eligibleRider();
+    $two = eligibleRider();
     foreach ([['new', $one], ['replace', $two], ['reassign', $one], ['unassign', null], ['cancel', null]] as [$code,$rider]) {
         $preview = taskPreview($actor, $task, $code, $rider);
         app(TaskOperation::class)->confirm($actor, $preview, $preview->preview_digest);
@@ -111,9 +106,9 @@ test('new replace reassign unassign and cancellation preserve allocation and tas
 });
 
 test('new cannot replace assigned work and pending verification is excluded from allocation', function (): void {
-    [$actor,$client,$customer,$account,$batch] = taskContext();
+    [$actor,$customer,$account,$batch] = taskContext();
     $task = app(SaveTask::class)->handle($actor, taskInput($batch, $account, $customer));
-    $rider = scopedRider($client);
+    $rider = eligibleRider();
     $op = taskPreview($actor, $task, 'new', $rider);
     app(TaskOperation::class)->confirm($actor, $op, $op->preview_digest);
     app(TaskOperation::class)->process($op->id);
@@ -123,29 +118,29 @@ test('new cannot replace assigned work and pending verification is excluded from
     $task->work_status = 'submitted';
     $task->review_status = 'pending';
     $task->save();
-    $blocked = taskPreview($actor, $task, 'reassign', scopedRider($client));
+    $blocked = taskPreview($actor, $task, 'reassign', eligibleRider());
     expect($blocked->result_counts['excluded'])->toBe(1);
 });
 
 test('stale previews and permissions revoked after confirmation cannot change allocation', function (): void {
-    [$actor,$client,$customer,$account,$batch] = taskContext();
+    [$actor,$customer,$account,$batch] = taskContext();
     $input = taskInput($batch, $account, $customer);
     $task = app(SaveTask::class)->handle($actor, $input);
-    $rider = scopedRider($client);
+    $rider = eligibleRider();
     $op = taskPreview($actor, $task, 'new', $rider);
     app(SaveTask::class)->handle($actor, ['priority_code' => 'urgent'] + $input, $task, 0);
     expect(fn () => app(TaskOperation::class)->confirm($actor, $op, $op->preview_digest))->toThrow(ValidationException::class);
     $op = taskPreview($actor, $task->refresh(), 'new', $rider);
     app(TaskOperation::class)->confirm($actor, $op, $op->preview_digest);
-    $actor->clientScopes()->update(['valid_to' => now()->format('Y-m-d H:i:s.uP')]);
+    $actor->syncRoles([]);
     app(TaskOperation::class)->process($op->id);
     expect($op->refresh()->status)->toBe('failed')->and(TaskAllocation::query()->count())->toBe(0);
 });
 
-test('rider eligibility and client access are rechecked during processing', function (): void {
-    [$actor,$client,$customer,$account,$batch] = taskContext();
+test('rider eligibility is rechecked during processing', function (): void {
+    [$actor,$customer,$account,$batch] = taskContext();
     $task = app(SaveTask::class)->handle($actor, taskInput($batch, $account, $customer));
-    $rider = scopedRider($client);
+    $rider = eligibleRider();
     $op = taskPreview($actor, $task, 'new', $rider);
     app(TaskOperation::class)->confirm($actor, $op, $op->preview_digest);
     $rider->is_active = false;
@@ -154,23 +149,19 @@ test('rider eligibility and client access are rechecked during processing', func
     expect($op->refresh()->status)->toBe('failed')->and($op->result_counts['failed'])->toBe(1)->and(TaskAllocation::query()->count())->toBe(0);
 });
 
-test('foreign account customer and batch references cannot escape client scope', function (): void {
-    [$actor,$client,$customer,$account,$batch] = taskContext();
-    $foreign = DebtAccount::factory()->create();
-    expect(fn () => app(SaveTask::class)->handle($actor, taskInput($batch, $foreign, $customer)))->toThrow(ModelNotFoundException::class);
-    $task = Task::factory()->create();
-    $this->actingAs($actor)->get(route('admin.tasks.show', $task))->assertNotFound();
-    expect(fn () => taskPreview($actor, $task, 'cancel'))->toThrow(HttpException::class);
-    expect(fn () => DB::transaction(fn () => Task::factory()->create(['assignment_batch_id' => $batch->id])))->toThrow(QueryException::class);
+test('an account without a current relationship to the customer cannot be tasked', function (): void {
+    [$actor,$customer,,$batch] = taskContext();
+    $unrelated = DebtAccount::factory()->create();
+    expect(fn () => app(SaveTask::class)->handle($actor, taskInput($batch, $unrelated, $customer)))->toThrow(ValidationException::class);
 });
 
 test('range mode requires approved source semantics and cannot invent numeric task IDs', function (): void {
-    [$actor,$client,$customer,$account,$batch] = taskContext();
+    [$actor,$customer,$account,$batch] = taskContext();
     expect(fn () => app(TaskOperation::class)->prepare($actor, ['assignment_batch_id' => $batch->id, 'selection_mode' => 'range', 'operation_code' => 'cancel', 'reason' => 'Synthetic range request']))->toThrow(ValidationException::class, 'IWK range processing');
 });
 
-test('task monitoring account editor and reviewed operations render using scoped records', function (): void {
-    [$actor,$client,$customer,$account,$batch] = taskContext();
+test('task monitoring account editor and reviewed operations render', function (): void {
+    [$actor,$customer,$account,$batch] = taskContext();
     $task = app(SaveTask::class)->handle($actor, taskInput($batch, $account, $customer));
     $this->actingAs($actor)->get(route('admin.tasks.index'))->assertOk()->assertSee('Task monitoring');
     $this->get(route('admin.tasks.show', $task))->assertOk()->assertSee('Task details');
@@ -183,10 +174,10 @@ test('task monitoring account editor and reviewed operations render using scoped
 });
 
 test('selected task operations reconcile exclusions and interrupted work without losing applied records', function (): void {
-    [$actor,$client,$customer,$account,$batch] = taskContext();
+    [$actor,$customer,$account,$batch] = taskContext();
     $one = app(SaveTask::class)->handle($actor, taskInput($batch, $account, $customer));
     $two = app(SaveTask::class)->handle($actor, taskInput($batch, $account, $customer));
-    $rider = scopedRider($client);
+    $rider = eligibleRider();
     $operation = app(TaskOperation::class)->prepare($actor, ['assignment_batch_id' => $batch->id, 'operation_code' => 'new', 'selection_mode' => 'selected', 'task_ids' => [$one->id, $two->id], 'target_collector_id' => $rider->id, 'reason' => 'Synthetic selected tasks']);
     app(TaskOperation::class)->confirm($actor, $operation, $operation->preview_digest);
     app(TaskOperation::class)->interrupted($operation->id);
@@ -196,7 +187,7 @@ test('selected task operations reconcile exclusions and interrupted work without
 });
 
 test('cancelling a queued operation and replaying its outbox event cannot alter tasks', function (): void {
-    [$actor,$client,$customer,$account,$batch] = taskContext();
+    [$actor,$customer,$account,$batch] = taskContext();
     $task = app(SaveTask::class)->handle($actor, taskInput($batch, $account, $customer));
     $operation = taskPreview($actor, $task, 'cancel');
     app(TaskOperation::class)->confirm($actor, $operation, $operation->preview_digest);
@@ -210,9 +201,9 @@ test('cancelling a queued operation and replaying its outbox event cannot alter 
 });
 
 test('database protects operation criteria task provenance and one current allocation', function (): void {
-    [$actor,$client,$customer,$account,$batch] = taskContext();
+    [$actor,$customer,$account,$batch] = taskContext();
     $task = app(SaveTask::class)->handle($actor, taskInput($batch, $account, $customer));
-    $rider = scopedRider($client);
+    $rider = eligibleRider();
     $op = taskPreview($actor, $task, 'new', $rider);
     expect(fn () => DB::transaction(fn () => DB::table('bulk_operations')->where('id', $op->id)->update(['reason' => 'Changed behind preview'])))->toThrow(QueryException::class);
     expect(fn () => DB::transaction(fn () => DB::table('tasks')->where('id', $task->id)->update(['source_iwk_id' => '123'])))->toThrow(QueryException::class);
@@ -223,9 +214,9 @@ test('database protects operation criteria task provenance and one current alloc
 });
 
 test('task and account actions reject missing permissions and the Rider portal cannot enter admin workspaces', function (): void {
-    [$actor,$client,$customer,$account,$batch] = taskContext();
+    [$actor,$customer,$account,$batch] = taskContext();
     $task = app(SaveTask::class)->handle($actor, taskInput($batch, $account, $customer));
-    $rider = scopedRider($client);
+    $rider = eligibleRider();
     $actor->removeRole('Admin')->givePermissionTo(['admin.access', 'tasks.view', 'tasks.monitor']);
     expect(fn () => app(SaveTask::class)->handle($actor, taskInput($batch, $account, $customer)))->toThrow(AuthorizationException::class);
     expect(fn () => taskPreview($actor, $task, 'new', $rider))->toThrow(HttpException::class);
@@ -233,7 +224,7 @@ test('task and account actions reject missing permissions and the Rider portal c
 });
 
 test('queued work blocks batch archival and dispatch only publishes the task outbox events', function (): void {
-    [$actor,$client,$customer,$account,$batch] = taskContext();
+    [$actor,$customer,$account,$batch] = taskContext();
     $task = app(SaveTask::class)->handle($actor, taskInput($batch, $account, $customer));
     $op = taskPreview($actor, $task, 'cancel');
     app(TaskOperation::class)->confirm($actor, $op, $op->preview_digest);
@@ -247,13 +238,13 @@ test('queued work blocks batch archival and dispatch only publishes the task out
 });
 
 test('invalid schedules inactive accounts and archived batches cannot create partial tasks', function (array $changes): void {
-    [$actor,$client,$customer,$account,$batch] = taskContext();
+    [$actor,$customer,$account,$batch] = taskContext();
     expect(fn () => app(SaveTask::class)->handle($actor, taskInput($batch, $account, $customer, $changes)))->toThrow(ValidationException::class);
     $this->assertDatabaseCount('tasks', 0);
 })->with([[['scheduled_visit_at' => 'invalid']], [['scheduled_visit_at' => '2026-10-22T10:00']], [['priority_code' => 'unknown']]]);
 
 test('returned incomplete work can be recoverably cancelled without a conflicting review projection', function (): void {
-    [$actor,$client,$customer,$account,$batch] = taskContext();
+    [$actor,$customer,$account,$batch] = taskContext();
     $task = app(SaveTask::class)->handle($actor, taskInput($batch, $account, $customer));
     $task->work_status = 'in_progress';
     $task->review_status = 'returned';
@@ -265,14 +256,14 @@ test('returned incomplete work can be recoverably cancelled without a conflictin
 });
 
 test('task monitoring supports exact account selection filters due fallback and cancelled states', function (): void {
-    [$actor,$client,$customer,$account,$batch] = taskContext();
+    [$actor,$customer,$account,$batch] = taskContext();
     $task = app(SaveTask::class)->handle($actor, taskInput($batch, $account, $customer, ['scheduled_visit_at' => '', 'due_at' => '']));
     Livewire::actingAs($actor)->test(Index::class)->set('query', $account->account_number)->assertSee($customer->display_name_ciphertext)->set('status', 'completed')->assertSee('No matching tasks');
     expect($task->effectiveDue()->timezone(config('dcms.business_timezone'))->format('Y-m-d H:i:s'))->toBe('2026-10-31 23:59:59');
 });
 
 test('the reviewed selection digest prevents hidden expansion before confirmation', function (): void {
-    [$actor,$client,$customer,$account,$batch] = taskContext();
+    [$actor,$customer,$account,$batch] = taskContext();
     $one = app(SaveTask::class)->handle($actor, taskInput($batch, $account, $customer));
     $two = app(SaveTask::class)->handle($actor, taskInput($batch, $account, $customer));
     $op = taskPreview($actor, $one, 'cancel');
@@ -283,8 +274,8 @@ test('the reviewed selection digest prevents hidden expansion before confirmatio
     expect(fn () => DB::transaction(fn () => BulkOperationItem::factory()->create(['bulk_operation_id' => $op->id, 'task_id' => $two->id])))->toThrow(QueryException::class);
 });
 
-test('customer account history eagerly loads policy scope for multiple linked accounts', function (): void {
-    [$actor,$client,$customer,$account,$batch] = taskContext();
+test('customer account history lists multiple linked accounts', function (): void {
+    [$actor,$customer,$account,$batch] = taskContext();
     app(SaveDebtAccount::class)->handle($actor, $customer, ['account_number' => '000456', 'currency' => 'MYR', 'status' => 'active', 'role_code' => 'owner', 'address' => 'Second Synthetic Road']);
     Livewire::actingAs($actor)->test(Show::class, ['customer' => $customer])->set('tab', 'accounts')->assertSee('000123')->assertSee('000456')->assertSee('Edit account');
 });

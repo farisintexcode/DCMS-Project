@@ -2,7 +2,6 @@
 
 namespace App\Actions\Calls;
 
-use App\Models\Client;
 use App\Models\CollectionActivity;
 use App\Models\Contact;
 use App\Models\Debtor;
@@ -26,7 +25,6 @@ class RecordCall
     public function handle(User $actor, Debtor $target, array $input, string $key): CollectionActivity
     {
         return DB::transaction(function () use ($actor, $target, $input, $key): CollectionActivity {
-            Client::query()->lockForUpdate()->findOrFail($target->client_id);
             $actor = $actor->fresh();
             $customer = $this->access->customer($actor, $target->id);
             $customer = Debtor::query()->lockForUpdate()->findOrFail($customer->id);
@@ -75,7 +73,7 @@ class RecordCall
             }
             $task = null;
             if (! empty($data['task'])) {
-                $task = Task::query()->where('public_id', $data['task'])->where('customer_id', $customer->id)->with('batch.client')->firstOrFail();
+                $task = Task::query()->where('public_id', $data['task'])->where('customer_id', $customer->id)->with('batch')->firstOrFail();
                 Gate::forUser($actor)->authorize('view', $task);
             }
             $contact = null;

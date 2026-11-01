@@ -5,15 +5,12 @@ namespace App\Services\Communications;
 use App\Models\Communication;
 use App\Models\Task;
 use App\Models\User;
-use App\Services\ClientAccess;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Gate;
 
-/** M14/UI64–67: recheck effective client and task scope for private letters. */
+/** M14/UI64–67: recheck task scope for private letters. */
 class LetterAccess
 {
-    public function __construct(private ClientAccess $clients) {}
-
     public function authorize(User $actor, bool $generate = false): void
     {
         abort_unless($actor->isActive() && $actor->can('admin.access') && $actor->can('communications.view') && $actor->can('customers.view'), 403);
@@ -26,7 +23,7 @@ class LetterAccess
     {
         $this->authorize($actor);
 
-        return Communication::query()->where('channel', 'letter')->whereHas('customer', fn (Builder $q) => $this->clients->scope($q, $actor))
+        return Communication::query()->where('channel', 'letter')
             ->when(! Gate::forUser($actor)->allows('viewAny', Task::class), fn (Builder $q) => $q->whereNull('task_id'));
     }
 

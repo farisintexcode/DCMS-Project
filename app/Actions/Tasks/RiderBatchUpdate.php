@@ -3,7 +3,6 @@
 namespace App\Actions\Tasks;
 
 use App\Models\AssignmentBatch;
-use App\Models\Client;
 use App\Models\CollectionActivity;
 use App\Models\FollowUp;
 use App\Models\PropertyInspection;
@@ -35,9 +34,9 @@ class RiderBatchUpdate
     {
         $actor = $actor->fresh();
         Gate::forUser($actor)->authorize('use-rider-interface');
-        abort_unless($actor->can('tasks.submit') && $actor->hasClientScope($batch->client), 403);
+        abort_unless($actor->can('tasks.submit'), 403);
         $data = $this->validate($input);
-        $tasks = $this->access->scope(Task::query(), $actor)->where('assignment_batch_id', $batch->id)->whereIn('public_id', $data['selection'])->with(['customer', 'account', 'batch.client', 'currentAllocation'])->orderBy('id')->get();
+        $tasks = $this->access->scope(Task::query(), $actor)->where('assignment_batch_id', $batch->id)->whereIn('public_id', $data['selection'])->with(['customer', 'account', 'batch', 'currentAllocation'])->orderBy('id')->get();
         if ($tasks->count() !== count($data['selection'])) {
             throw ValidationException::withMessages(['selection' => 'Some selected tasks are unavailable. Reload your current allocation.']);
         }
@@ -84,7 +83,6 @@ class RiderBatchUpdate
         return DB::transaction(function () use ($actor, $preview): int {
             $actor = $actor->fresh();
             $context = AssignmentBatch::query()->where('public_id', $preview['batch'])->firstOrFail();
-            Client::query()->whereKey($context->client_id)->lockForUpdate()->firstOrFail();
             $batch = AssignmentBatch::query()->whereKey($context->id)->lockForUpdate()->firstOrFail();
             $tasks = $this->access->scope(Task::query(), $actor)->where('assignment_batch_id', $batch->id)->whereIn('public_id', $preview['input']['selection'])->orderBy('id')->lockForUpdate()->get()->keyBy('public_id');
             $fresh = $this->preview($actor, $batch, $preview['input']);

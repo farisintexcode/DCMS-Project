@@ -1,13 +1,10 @@
 <?php
 
 use App\Livewire\Admin\Home;
-use App\Models\Client;
 use App\Models\Staff;
 use App\Models\User;
-use App\Models\UserClientScope;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
-use Illuminate\Support\Facades\Gate;
 use Livewire\Livewire;
 
 uses(LazilyRefreshDatabase::class);
@@ -45,26 +42,6 @@ test('admin bundle does not imply rider eligibility or approval authority', func
     expect($user->can('roles.manage'))->toBeFalse();
 });
 
-test('client action requires a current effective grant', function (string $validity, bool $allowed): void {
-    $this->freezeTime();
-    $user = User::factory()->create();
-    $user->assignRole('Admin');
-    $client = Client::factory()->create();
-    if ($validity !== 'missing') {
-        $scope = new UserClientScope;
-        $scope->user_id = $user->id;
-        $scope->client_id = $client->id;
-        $scope->granted_by = $user->id;
-        $scope->reason = 'Synthetic portfolio grant';
-        $scope->valid_from = $validity === 'future' ? now()->addDay() : now()->subDays(2);
-        $scope->valid_to = $validity === 'expired' ? now()->subDay() : null;
-        $scope->save();
-    }
-
-    expect(Gate::forUser($user)->allows('view', $client))->toBe($allowed);
-    expect(Gate::forUser($user)->allows('view', Client::factory()->create()))->toBeFalse();
-})->with([['missing', false], ['future', false], ['expired', false], ['current', true]]);
-
 test('revoked action grant is rechecked by livewire', function (): void {
     $user = User::factory()->create();
     $user->givePermissionTo('admin.access');
@@ -86,17 +63,4 @@ test('monitoring has no local role bypass', function (): void {
     $user->assignRole('Rider');
 
     $this->actingAs($user)->get('/pulse')->assertForbidden();
-});
-
-test('client scope does not grant the action permission', function (): void {
-    $user = User::factory()->create();
-    $client = Client::factory()->create();
-    $scope = new UserClientScope;
-    $scope->user_id = $user->id;
-    $scope->client_id = $client->id;
-    $scope->granted_by = $user->id;
-    $scope->reason = 'Synthetic portfolio grant';
-    $scope->save();
-
-    expect(Gate::forUser($user)->allows('view', $client))->toBeFalse();
 });

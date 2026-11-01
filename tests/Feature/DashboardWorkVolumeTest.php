@@ -2,11 +2,9 @@
 
 use App\Livewire\Admin\Home;
 use App\Models\AssignmentBatch;
-use App\Models\Client;
 use App\Models\DebtAccount;
 use App\Models\Task;
 use App\Models\User;
-use App\Models\UserClientScope;
 use App\Services\Tasks\WorkVolume;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
@@ -21,19 +19,18 @@ beforeEach(function (): void {
 
 function volumeTask(AssignmentBatch $batch, array $attributes = []): Task
 {
-    return Task::factory()->create(['assignment_batch_id' => $batch->id, 'debt_account_id' => DebtAccount::factory()->create(['client_id' => $batch->client_id])->id, ...$attributes]);
+    return Task::factory()->create(['assignment_batch_id' => $batch->id, 'debt_account_id' => DebtAccount::factory()->create()->id, ...$attributes]);
 }
 
-test('daily volume counts assignments and tasks per local day within client scope', function (): void {
-    [$user, $client] = customerOperator();
-    $today = AssignmentBatch::factory()->create(['client_id' => $client->id]);
+test('daily volume counts assignments and tasks per local day', function (): void {
+    $user = staffManager();
+    $today = AssignmentBatch::factory()->create();
     $localMidnight = now()->timezone(config('dcms.business_timezone'))->startOfDay()->utc();
-    AssignmentBatch::factory()->create(['client_id' => $client->id, 'created_at' => $localMidnight->copy()->subSecond()]);
-    AssignmentBatch::factory()->create(['client_id' => $client->id, 'created_at' => now()->subDays(2)]);
-    AssignmentBatch::factory()->create(['client_id' => $client->id, 'created_at' => now()->subDays(10)]);
+    AssignmentBatch::factory()->create(['created_at' => $localMidnight->copy()->subSecond()]);
+    AssignmentBatch::factory()->create(['created_at' => now()->subDays(2)]);
+    AssignmentBatch::factory()->create(['created_at' => now()->subDays(10)]);
     volumeTask($today);
     volumeTask($today);
-    volumeTask(AssignmentBatch::factory()->create());
 
     $volume = app(WorkVolume::class)->forUser($user, 'daily', 7);
 
@@ -44,32 +41,21 @@ test('daily volume counts assignments and tasks per local day within client scop
         ->and($volume['assignments'])->toBe(3)->and($volume['tasks'])->toBe(2);
 });
 
-test('monthly volume groups by local month and the client filter narrows both series', function (): void {
-    [$user, $client] = customerOperator();
-    $other = Client::factory()->create();
-    $scope = new UserClientScope;
-    $scope->user_id = $user->id;
-    $scope->client_id = $other->id;
-    $scope->granted_by = $user->id;
-    $scope->reason = 'Synthetic second client scope';
-    $scope->valid_from = now()->subMinute();
-    $scope->save();
-    volumeTask(AssignmentBatch::factory()->create(['client_id' => $client->id, 'created_at' => '2026-08-15 04:00:00']), ['created_at' => '2026-08-15 04:00:00']);
-    AssignmentBatch::factory()->create(['client_id' => $client->id, 'created_at' => '2026-07-20 04:00:00']);
-    volumeTask(AssignmentBatch::factory()->create(['client_id' => $other->id]));
+test('monthly volume groups by local month', function (): void {
+    $user = staffManager();
+    volumeTask(AssignmentBatch::factory()->create(['created_at' => '2026-08-15 04:00:00']), ['created_at' => '2026-08-15 04:00:00']);
+    AssignmentBatch::factory()->create(['created_at' => '2026-07-20 04:00:00']);
+    volumeTask(AssignmentBatch::factory()->create());
 
-    $all = app(WorkVolume::class)->forUser($user, 'monthly', 3);
-    $filtered = app(WorkVolume::class)->forUser($user, 'monthly', 3, $client->id);
+    $volume = app(WorkVolume::class)->forUser($user, 'monthly', 3);
 
-    expect($all['buckets']->pluck('label')->all())->toBe(['Aug', 'Sep', 'Oct'])
-        ->and($all['buckets']->pluck('assignments')->all())->toBe([1, 0, 1])
-        ->and($all['buckets']->pluck('tasks')->all())->toBe([1, 0, 1])
-        ->and($filtered['buckets']->pluck('assignments')->all())->toBe([1, 0, 0])
-        ->and($filtered['buckets']->pluck('tasks')->all())->toBe([1, 0, 0]);
+    expect($volume['buckets']->pluck('label')->all())->toBe(['Aug', 'Sep', 'Oct'])
+        ->and($volume['buckets']->pluck('assignments')->all())->toBe([1, 0, 1])
+        ->and($volume['buckets']->pluck('tasks')->all())->toBe([1, 0, 1]);
 });
 
 test('dashboard filters switch the period and fall back to a supported range', function (): void {
-    [$user] = customerOperator();
+    $user = staffManager();
 
     Livewire::actingAs($user)->test(Home::class)
         ->assertSee('Assignments and tasks created')->assertViewHas('volumeRange', 7)

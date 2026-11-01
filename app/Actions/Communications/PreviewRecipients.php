@@ -2,7 +2,6 @@
 
 namespace App\Actions\Communications;
 
-use App\Models\Client;
 use App\Models\Communication;
 use App\Models\CommunicationBatch;
 use App\Models\CommunicationPreference;
@@ -29,7 +28,7 @@ class PreviewRecipients
 
     private function input(array $input): array
     {
-        $data = Validator::make($input, ['client' => ['required', 'uuid'], 'template' => ['required', 'uuid'], 'mode' => ['required', 'in:single,bulk'], 'rows' => ['required', 'array', 'list', 'min:1', 'max:'.config('communications.preview_max_recipients')], 'rows.*' => ['array:contact,account,task'], 'rows.*.contact' => ['required', 'uuid'], 'rows.*.account' => ['nullable', 'uuid'], 'rows.*.task' => ['nullable', 'uuid']])->validate();
+        $data = Validator::make($input, ['template' => ['required', 'uuid'], 'mode' => ['required', 'in:single,bulk'], 'rows' => ['required', 'array', 'list', 'min:1', 'max:'.config('communications.preview_max_recipients')], 'rows.*' => ['array:contact,account,task'], 'rows.*.contact' => ['required', 'uuid'], 'rows.*.account' => ['nullable', 'uuid'], 'rows.*.task' => ['nullable', 'uuid']])->validate();
         if ($data['mode'] === 'single' && count($data['rows']) !== 1) {
             throw ValidationException::withMessages(['rows' => 'Individual previews contain exactly one explicit contact.']);
         }
@@ -42,12 +41,11 @@ class PreviewRecipients
     private function plan(User $actor, array $data): array
     {
         $this->access->compose($actor, $data['mode'] === 'bulk');
-        $client = $this->access->client($actor, $data['client']);
         $template = CommunicationTemplate::query()->where('public_id', $data['template'])->where('channel', 'email')->where('status', 'approved')->first();
         if (! $template) {
             throw ValidationException::withMessages(['template' => 'Select a currently approved template version.']);
         }
-        $contacts = $this->access->contacts($actor)->whereHas('debtor', fn ($q) => $q->where('client_id', $client->id))->whereIn('public_id', array_column($data['rows'], 'contact'))->with('debtor.client')->get()->keyBy('public_id');
+        $contacts = $this->access->contacts($actor)->whereIn('public_id', array_column($data['rows'], 'contact'))->with('debtor')->get()->keyBy('public_id');
         $rows = [];
         foreach ($data['rows'] as $selection) {
             $contact = $contacts->get($selection['contact']);
@@ -98,7 +96,7 @@ class PreviewRecipients
             $counts[$row['snapshot']['classification']]++;
         } $counts['excluded'] = $counts['selected'] - $counts['eligible'];
 
-        return ['client' => $client, 'template' => $template, 'rows' => $rows, 'counts' => $counts, 'digest' => hash('sha256', json_encode([$data, $rows], JSON_THROW_ON_ERROR))];
+        return ['template' => $template, 'rows' => $rows, 'counts' => $counts, 'digest' => hash('sha256', json_encode([$data, $rows], JSON_THROW_ON_ERROR))];
     }
 
     public function create(User $actor, array $input, string $key): CommunicationBatch
@@ -109,18 +107,16 @@ class PreviewRecipients
         return DB::transaction(function () use ($actor, $data, $key): CommunicationBatch {
             $actor = $actor->fresh();
             $this->access->compose($actor, $data['mode'] === 'bulk');
-            $client = $this->access->client($actor, $data['client']);
-            Client::query()->whereKey($client->id)->lockForUpdate()->firstOrFail();
             $prior = CommunicationBatch::query()->where('idempotency_key', $key)->first();
             if ($prior) {
-                abort_unless($prior->requested_by === $actor->id && $prior->client_id === $client->id && $this->input($prior->selection_criteria) === $data, 403);
+                abort_unless($prior->requested_by === $actor->id && $this->input($prior->selection_criteria) === $data, 403);
 
                 return $prior;
             }
             CommunicationTemplate::query()->where('public_id', $data['template'])->lockForUpdate()->firstOrFail();
             $plan = $this->plan($actor, $data);
             $batch = new CommunicationBatch;
-            $batch->forceFill(['client_id' => $client->id, 'template_id' => $plan['template']->id, 'requested_by' => $actor->id, 'selection_criteria' => $data, 'counts' => (object) [], 'idempotency_key' => $key])->save();
+            $batch->forceFill(['template_id' => $plan['template']->id, 'requested_by' => $actor->id, 'selection_criteria' => $data, 'counts' => (object) [], 'idempotency_key' => $key])->save();
             foreach ($plan['rows'] as $row) {
                 $message = new Communication;
                 $category = $row['snapshot']['classification'];
@@ -128,7 +124,6 @@ class PreviewRecipients
                 $message->forceFill(['customer_id' => $row['customer_id'], 'task_id' => $row['task_id'], 'contact_id' => $row['contact_id'], 'batch_id' => $batch->id, 'template_id' => $plan['template']->id, 'channel' => 'email', 'direction' => 'outgoing', 'recipient_ciphertext' => $row['recipient'], 'recipient_fingerprint' => $row['fingerprint'], 'subject_ciphertext' => $row['subject'], 'body_ciphertext' => $row['body'], 'context_snapshot_ciphertext' => $row['snapshot'], 'delivery_status' => $category === 'eligible' ? 'draft' : 'suppressed', 'failure_code' => $category === 'eligible' ? null : ($category === 'conflict' ? 'shared_destination_context' : ($category === 'duplicate' ? 'duplicate_destination' : $issues[0])), 'idempotency_key' => (string) Str::uuid7()])->save();
             }
             $this->access->compose($actor->fresh(), $data['mode'] === 'bulk');
-            $this->access->client($actor->fresh(), $data['client']);
             $batch->forceFill(['status' => 'previewed', 'counts' => $plan['counts'], 'preview_digest' => $plan['digest'], 'lock_version' => 1])->save();
             $this->audit->record($actor, 'communication.preview_saved', $batch->public_id, ['status' => 'previewed'], module: 'M14', entityType: 'communication_batch');
 
@@ -154,10 +149,10 @@ class PreviewRecipients
     public function recipientIsCurrent(User $actor, Communication $message): bool
     {
         try {
-            $message->loadMissing(['batch.client', 'batch.template']);
+            $message->loadMissing(['batch', 'batch.template']);
             $batch = $message->batch;
             $selection = $message->context_snapshot_ciphertext['selection'];
-            $plan = $this->plan($actor, $this->input(['client' => $batch->client->public_id, 'template' => $batch->template->public_id, 'mode' => $batch->selection_criteria['mode'], 'rows' => [$selection]]));
+            $plan = $this->plan($actor, $this->input(['template' => $batch->template->public_id, 'mode' => $batch->selection_criteria['mode'], 'rows' => [$selection]]));
             $row = $plan['rows'][0];
 
             return $row['snapshot'] == $message->context_snapshot_ciphertext && $row['snapshot']['classification'] === 'eligible' && $row['recipient'] === $message->recipient_ciphertext && $row['subject'] === $message->subject_ciphertext && $row['body'] === $message->body_ciphertext;
@@ -169,7 +164,6 @@ class PreviewRecipients
     public function cancel(User $actor, CommunicationBatch $target, int $version): CommunicationBatch
     {
         return DB::transaction(function () use ($actor, $target, $version): CommunicationBatch {
-            Client::query()->whereKey($target->client_id)->lockForUpdate()->firstOrFail();
             $actor = $actor->fresh();
             $batch = CommunicationBatch::query()->lockForUpdate()->findOrFail($target->id);
             Gate::forUser($actor)->authorize('cancel', $batch);

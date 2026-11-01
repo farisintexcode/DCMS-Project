@@ -2,7 +2,6 @@
 
 namespace App\Policies;
 
-use App\Models\Client;
 use App\Models\Debtor;
 use App\Models\User;
 
@@ -15,12 +14,12 @@ class DebtorPolicy
 
     public function view(User $user, Debtor $customer): bool
     {
-        return $this->viewAny($user) && $user->hasClientScope($customer->client);
+        return $this->viewAny($user);
     }
 
-    public function create(User $user, Client $client): bool
+    public function create(User $user): bool
     {
-        return $user->isActive() && $user->can('customers.create') && $user->hasClientScope($client);
+        return $user->isActive() && $user->can('customers.create');
     }
 
     public function update(User $user, Debtor $customer): bool

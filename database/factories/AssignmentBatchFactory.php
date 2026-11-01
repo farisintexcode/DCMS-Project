@@ -3,7 +3,6 @@
 namespace Database\Factories;
 
 use App\Models\AssignmentBatch;
-use App\Models\Client;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -20,7 +19,6 @@ class AssignmentBatchFactory extends Factory
     public function definition(): array
     {
         return [
-            'client_id' => Client::factory(),
             'created_by' => User::factory(),
             'name' => 'Synthetic recovery batch',
             'external_reference' => fake()->unique()->bothify('B-######'),

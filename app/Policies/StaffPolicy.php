@@ -5,7 +5,7 @@ namespace App\Policies;
 use App\Models\Staff;
 use App\Models\User;
 
-/** M10/UI30–32: organization-level personnel access; client data remains separately scoped. */
+/** M10/UI30–32: organization-level personnel access. */
 class StaffPolicy
 {
     public function viewAny(User $user): bool

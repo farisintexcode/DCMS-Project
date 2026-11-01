@@ -7,7 +7,6 @@
 <x-select name="status" label="Attendance status" wire:model="status"><option value="">All statuses</option>@foreach(\App\Services\Attendance\AttendanceStatus::LABELS as $key=>$text)<option value="{{ $key }}">{{ $text }}</option>@endforeach</x-select>
 <x-input name="search" label="Rider name or staff number" wire:model="search" placeholder="Starts with…" />
 <x-select name="rider" label="Rider" wire:model="rider"><option value="">All accessible Riders</option>@foreach($riders as $option)<option value="{{ $option->public_id }}">{{ $option->staff_no }} · {{ $option->full_name }}</option>@endforeach</x-select>
-<x-select name="client" label="Shared client scope" wire:model="client"><option value="">All effective client scopes</option>@foreach($clients as $option)<option value="{{ $option->public_id }}">{{ $option->name }}</option>@endforeach</x-select>
 <x-button variant="secondary">Apply filters</x-button>
 </form>
 @if($filterError)<p role="alert" class="rounded-xl bg-amber-50 p-4 text-sm text-amber-950">{{ $filterError }}</p>@endif

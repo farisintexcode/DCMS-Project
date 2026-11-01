@@ -30,11 +30,10 @@ test('import history mapping and masked preview remain usable on desktop and mob
     expect((await download).suggestedFilename()).toMatch(/^import-errors-.*\.csv$/);
     await page.goto('/admin/imports/configuration');
     await expect(page.getByRole('heading', { name: 'Import configuration', exact: true })).toBeVisible();
-    await page.getByLabel('Alias client *', { exact: true }).selectOption({ label: 'Synthetic Client' });
     const sourceHeader = `Browser header ${test.info().project.name}`;
     await page.getByLabel('Canonical field *', { exact: true }).selectOption({ label: 'name · string · v1' });
     await page.getByLabel('Source header alias *', { exact: true }).fill(sourceHeader);
-    await page.getByRole('button', { name: 'Publish client alias', exact: true }).click();
+    await page.getByRole('button', { name: 'Publish alias', exact: true }).click();
     await expect(page.getByRole('cell', { name: sourceHeader, exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: test.info().outputPath('import-configuration.png'), fullPage: true });

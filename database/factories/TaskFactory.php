@@ -13,9 +13,9 @@ class TaskFactory extends Factory
 {
     public function definition(): array
     {
-        return ['debt_account_id' => DebtAccount::factory(), 'assignment_batch_id' => fn (array $a) => AssignmentBatch::factory()->create(['client_id' => DebtAccount::query()->findOrFail($a['debt_account_id'])->client_id])->id, 'customer_id' => function (array $a): int {
+        return ['debt_account_id' => DebtAccount::factory(), 'assignment_batch_id' => AssignmentBatch::factory(), 'customer_id' => function (array $a): int {
             $account = DebtAccount::query()->findOrFail($a['debt_account_id']);
-            $customer = Debtor::factory()->create(['client_id' => $account->client_id]);
+            $customer = Debtor::factory()->create();
             AccountParty::factory()->create(['debt_account_id' => $account->id, 'debtor_id' => $customer->id]);
 
             return $customer->id;

@@ -2,7 +2,6 @@
 
 namespace App\Actions\Communications;
 
-use App\Models\Client;
 use App\Models\Communication;
 use App\Models\CommunicationAttempt;
 use App\Models\CommunicationBatch;
@@ -26,7 +25,6 @@ class DeliverEmail
     {
         return DB::transaction(function () use ($actor, $target, $version, $digest): CommunicationBatch {
             $this->capacity->lock();
-            Client::query()->whereKey($target->client_id)->lockForUpdate()->firstOrFail();
             $batch = CommunicationBatch::query()->lockForUpdate()->findOrFail($target->id);
             $actor = $actor->fresh();
             Gate::forUser($actor)->authorize('confirm', $batch);
@@ -70,8 +68,7 @@ class DeliverEmail
     {
         $claim = DB::transaction(function () use ($messageId): array {
             $this->capacity->lock();
-            $message = Communication::query()->with(['batch.client', 'batch.template', 'batch.requester'])->findOrFail($messageId);
-            Client::query()->whereKey($message->batch->client_id)->lockForUpdate()->firstOrFail();
+            $message = Communication::query()->with(['batch', 'batch.template', 'batch.requester'])->findOrFail($messageId);
             $batch = CommunicationBatch::query()->lockForUpdate()->findOrFail($message->batch_id);
             $message->refresh();
             if ($message->delivery_status !== 'queued' || $batch->status === 'cancelled') {

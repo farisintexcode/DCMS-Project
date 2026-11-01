@@ -2,7 +2,6 @@
 
 namespace App\Actions\Communications;
 
-use App\Models\Client;
 use App\Models\Communication;
 use App\Models\CommunicationAttempt;
 use App\Models\CommunicationBatch;
@@ -105,7 +104,6 @@ class ApplySesReceipt
                     'Permanent' => 'hard_bounced','Transient' => 'soft_bounced', default => 'unknown'
                 };
             }
-            Client::query()->whereKey($message->batch->client_id)->lockForUpdate()->firstOrFail();
             $message->refresh();
             $normalized = new CommunicationEvent;
             $code = $type === 'DeliveryDelay' ? 'delivery_delayed' : ($state === 'unknown' ? 'bounce_under_review' : $state);
@@ -149,7 +147,7 @@ class ApplySesReceipt
         $account = $message->task?->debt_account_id ?? DebtAccount::query()->where('public_id', $selection['account'] ?? '')->value('id');
         $current = CommunicationPreference::query()->where('customer_id', $message->customer_id)->where('contact_id', $message->contact_id)->where('debt_account_id', $account)->where('is_current', true)->first();
         $pref = new CommunicationPreference;
-        $pref->forceFill(['client_id' => $message->batch->client_id, 'customer_id' => $message->customer_id, 'contact_id' => $message->contact_id, 'debt_account_id' => $account, 'task_id' => $message->task_id, 'state' => $state, 'basis' => null, 'source_integration_event_id' => $event->id, 'evidence_ciphertext' => ['source' => 'Authenticated Amazon SES receipt', 'reference' => $event->public_id, 'email' => $message->recipient_ciphertext, 'email_source' => 'Frozen outgoing envelope', 'attempt' => $attempt->public_id], 'reason_ciphertext' => 'Verified provider feedback requires suppression and review.', 'effective_at' => now(), 'recorded_by' => null, 'review_status' => 'pending', 'is_current' => false, 'supersedes_id' => $current?->id, 'request_key' => (string) Str::uuid7()])->save();
+        $pref->forceFill(['customer_id' => $message->customer_id, 'contact_id' => $message->contact_id, 'debt_account_id' => $account, 'task_id' => $message->task_id, 'state' => $state, 'basis' => null, 'source_integration_event_id' => $event->id, 'evidence_ciphertext' => ['source' => 'Authenticated Amazon SES receipt', 'reference' => $event->public_id, 'email' => $message->recipient_ciphertext, 'email_source' => 'Frozen outgoing envelope', 'attempt' => $attempt->public_id], 'reason_ciphertext' => 'Verified provider feedback requires suppression and review.', 'effective_at' => now(), 'recorded_by' => null, 'review_status' => 'pending', 'is_current' => false, 'supersedes_id' => $current?->id, 'request_key' => (string) Str::uuid7()])->save();
         $this->audit->record(null, 'communication.provider_restriction', $pref->public_id, ['status' => $state, 'evidence_fingerprint' => $event->payload_digest], module: 'M14', entityType: 'communication_preference', previous: ['status' => $current?->state ?? 'unknown']);
     }
 

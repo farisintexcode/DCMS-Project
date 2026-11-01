@@ -35,11 +35,6 @@
         @endcanany
         <div class="sidebar-divider" x-show="!query.trim()"></div>
         <p class="sidebar-section sidebar-label" x-show="!query.trim()">Supporting modules</p>
-        @can('scopes.manage')
-        <x-sidebar-group label="Client management" icon="users" :active="request()->routeIs('admin.customers.clients')" keywords="Clients Client management Client categories">
-            <x-sidebar-item label="Clients" icon="shield" parent="Client management" :href="route('admin.customers.clients')" :active="request()->routeIs('admin.customers.clients')" />
-        </x-sidebar-group>
-        @endcan
         @can('viewAny',\App\Models\CollectionActivity::class)<x-sidebar-item label="Call Centre" icon="phone" :href="route('admin.calls.index')" :active="request()->routeIs('admin.calls.*')" />@endcan
         @can('viewAny',\App\Models\CommunicationTemplate::class)<x-sidebar-item label="Communications" icon="mail" :href="route('admin.communications.index')" :active="request()->routeIs('admin.communications.*')" />@endcan
         @can('roles.manage')<x-sidebar-item label="Administration" icon="settings" planned />@endcan

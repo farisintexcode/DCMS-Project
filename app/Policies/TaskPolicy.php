@@ -2,7 +2,6 @@
 
 namespace App\Policies;
 
-use App\Models\Client;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\Tasks\RiderAccess;
@@ -21,12 +20,12 @@ class TaskPolicy
 
     public function view(User $user, Task $task): bool
     {
-        return $this->viewAny($user) && $user->hasClientScope($task->batch->client);
+        return $this->viewAny($user);
     }
 
-    public function create(User $user, Client $client): bool
+    public function create(User $user): bool
     {
-        return $this->viewAny($user) && $user->can('tasks.create') && $user->hasClientScope($client);
+        return $this->viewAny($user) && $user->can('tasks.create');
     }
 
     public function update(User $user, Task $task): bool

@@ -3,7 +3,6 @@
 namespace App\Livewire\Rider\Tasks;
 
 use App\Models\TaskSubmission;
-use App\Services\Tasks\TaskAccess;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
@@ -23,11 +22,11 @@ class SubmissionHistory extends Component
         $this->submissionId = $submission->id;
     }
 
-    public function render(TaskAccess $access): View
+    public function render(): View
     {
         Gate::authorize('use-rider-interface');
         abort_unless(Auth::user()->can('tasks.view'), 403);
-        $submission = TaskSubmission::query()->where('submitted_by', Auth::id())->whereHas('task', fn ($q) => $access->scope($q, Auth::user()))->findOrFail($this->submissionId);
+        $submission = TaskSubmission::query()->where('submitted_by', Auth::id())->findOrFail($this->submissionId);
 
         return view('livewire.rider.tasks.submission-history', compact('submission'));
     }

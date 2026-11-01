@@ -5,25 +5,22 @@ namespace App\Services\Tasks;
 use App\Models\AssignmentBatch;
 use App\Models\Task;
 use App\Models\User;
-use App\Services\ClientAccess;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 
-/** Dashboard volume of assignments and tasks created per local day or month, within the actor's client scope. */
+/** Dashboard volume of assignments and tasks created per local day or month. */
 class WorkVolume
 {
     /** @var array{daily: list<int>, monthly: list<int>} */
     public const RANGES = ['daily' => [7, 14, 30], 'monthly' => [3, 6, 12]];
-
-    public function __construct(private ClientAccess $access, private TaskAccess $tasks) {}
 
     /**
      * A series the actor may not view is null; when neither is viewable the whole result is null.
      *
      * @return array{buckets: Collection<int, array{label: string, date: string, assignments: ?int, tasks: ?int}>, assignments: ?int, tasks: ?int}|null
      */
-    public function forUser(User $user, string $period, int $range, ?int $clientId = null): ?array
+    public function forUser(User $user, string $period, int $range): ?array
     {
         $canViewAssignments = Gate::forUser($user)->allows('viewAny', AssignmentBatch::class);
         $canViewTasks = Gate::forUser($user)->allows('viewAny', Task::class);
@@ -42,11 +39,11 @@ class WorkVolume
 
         $assignments = null;
         if ($canViewAssignments) {
-            $assignments = $count($this->access->scope(AssignmentBatch::query(), $user)->when($clientId !== null, fn ($q) => $q->where('client_id', $clientId)));
+            $assignments = $count(AssignmentBatch::query());
         }
         $tasks = null;
         if ($canViewTasks) {
-            $tasks = $count($this->tasks->scope(Task::query(), $user)->when($clientId !== null, fn ($q) => $q->whereHas('batch', fn ($q) => $q->where('client_id', $clientId))));
+            $tasks = $count(Task::query());
         }
 
         $buckets = collect(range(0, $range - 1))->map(function (int $offset) use ($monthly, $start, $range, $assignments, $tasks): array {

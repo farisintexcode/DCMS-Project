@@ -5,7 +5,6 @@ namespace App\Models;
 use App\Models\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CustomerCategory extends Model
@@ -19,11 +18,6 @@ class CustomerCategory extends Model
         return ['is_active' => 'boolean'];
     }
 
-    public function client(): BelongsTo
-    {
-        return $this->belongsTo(Client::class);
-    }
-
     public function categoryAssignments(): HasMany
     {
         return $this->hasMany(CustomerCategoryAssignment::class, 'category_id');
@@ -31,6 +25,6 @@ class CustomerCategory extends Model
 
     public function revision(): string
     {
-        return hash('sha256', json_encode([$this->id, $this->client_id, $this->code, $this->name, $this->description, $this->is_active, $this->updated_at?->format('Y-m-d H:i:s.uP')], JSON_THROW_ON_ERROR));
+        return hash('sha256', json_encode([$this->id, $this->code, $this->name, $this->description, $this->is_active, $this->updated_at?->format('Y-m-d H:i:s.uP')], JSON_THROW_ON_ERROR));
     }
 }

@@ -55,8 +55,8 @@ class Review extends Component
 
     private function batch(): ImportBatch
     {
-        $batch = ImportBatch::query()->with(['client', 'template', 'source'])->where('public_id', $this->importId)->firstOrFail();
-        abort_unless(Auth::user()->hasClientScope($batch->client), 404);
+        $batch = ImportBatch::query()->with(['template', 'source'])->where('public_id', $this->importId)->firstOrFail();
+        abort_unless(Auth::user()->isActive(), 404);
         Gate::authorize('view', $batch);
 
         return $batch;
@@ -181,6 +181,6 @@ class Review extends Component
             }
         }
 
-        return view('livewire.admin.imports.review', ['samples' => $samples, 'batch' => $batch, 'sheets' => $sheets, 'mappings' => $batch->mappings()->orderBy('source_column_index')->get(), 'fields' => ImportField::query()->whereIn('id', $batch->template->schema_definition['field_ids'])->get(), 'profiles' => ImportMappingProfile::query()->where('client_id', $batch->client_id)->where('template_id', $batch->template_id)->where('is_active', true)->get(), 'rows' => $rows, 'audits' => Auth::user()->can('audit.view') ? AuditLog::query()->where('module', 'M04')->where('entity_id', $batch->public_id)->latest('id')->limit(30)->get() : collect()]);
+        return view('livewire.admin.imports.review', ['samples' => $samples, 'batch' => $batch, 'sheets' => $sheets, 'mappings' => $batch->mappings()->orderBy('source_column_index')->get(), 'fields' => ImportField::query()->whereIn('id', $batch->template->schema_definition['field_ids'])->get(), 'profiles' => ImportMappingProfile::query()->where('template_id', $batch->template_id)->where('is_active', true)->get(), 'rows' => $rows, 'audits' => Auth::user()->can('audit.view') ? AuditLog::query()->where('module', 'M04')->where('entity_id', $batch->public_id)->latest('id')->limit(30)->get() : collect()]);
     }
 }

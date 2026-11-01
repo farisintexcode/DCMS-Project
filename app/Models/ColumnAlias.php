@@ -23,9 +23,4 @@ class ColumnAlias extends Model
     {
         return $this->belongsTo(ImportField::class, 'field_id');
     }
-
-    public function client(): BelongsTo
-    {
-        return $this->belongsTo(Client::class);
-    }
 }

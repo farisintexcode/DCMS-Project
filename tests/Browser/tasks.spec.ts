@@ -24,7 +24,6 @@ test('customer account manual task editing and exact allocation preview are usab
     await page.getByRole('button', { name: 'Save account', exact: true }).click();
     await expect(page.getByRole('heading', { name: account, exact: true })).toBeVisible();
     await page.goto('/admin/tasks/create');
-    await page.getByLabel('Client *', { exact: true }).selectOption({ label: 'Synthetic Client' });
     await page.getByLabel('Assignment batch *', { exact: true }).selectOption({ label: 'Synthetic Task Batch · domestic_dr' });
     await page.getByLabel('Customer *', { exact: true }).selectOption({ label: 'TASK-UI · Synthetic Task Customer' });
     await page.getByLabel('Service account *', { exact: true }).selectOption({ label: `${account} · active` });

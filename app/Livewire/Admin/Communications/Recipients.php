@@ -7,7 +7,6 @@ use App\Models\AccountParty;
 use App\Models\CommunicationTemplate;
 use App\Models\CustomerCategory;
 use App\Models\Task;
-use App\Services\ClientAccess;
 use App\Services\Communications\RecipientAccess;
 use App\Services\Communications\TemplateContext;
 use App\Services\Customers\CustomerSearch;
@@ -29,8 +28,6 @@ class Recipients extends Component
 
     #[Locked]
     public string $requestKey;
-
-    public string $client = '';
 
     public string $template = '';
 
@@ -57,13 +54,8 @@ class Recipients extends Component
 
     public function updated(string $property): void
     {
-        if (in_array($property, ['client', 'query', 'searchBy', 'category', 'from', 'until'], true)) {
+        if (in_array($property, ['query', 'searchBy', 'category', 'from', 'until'], true)) {
             $this->resetPage();
-        }
-        if ($property === 'client') {
-            $this->selected = [];
-            $this->contexts = [];
-            $this->category = '';
         }
         if (preg_match('/^contexts\.([a-zA-Z0-9-]+)\.(account|task)$/', $property, $m)) {
             $this->contexts[$m[1]][$m[2] === 'account' ? 'task' : 'account'] = '';
@@ -82,19 +74,14 @@ class Recipients extends Component
     {
         Validator::make(['selected' => $this->selected, 'contexts' => $this->contexts], ['contexts' => ['array'], 'contexts.*' => ['array'], 'contexts.*.account' => ['nullable', 'uuid'], 'contexts.*.task' => ['nullable', 'uuid'], 'selected' => ['required', 'array', 'list', 'max:'.config('communications.preview_max_recipients')], 'selected.*' => ['uuid']])->validate();
         $rows = array_map(fn ($id) => ['contact' => $id, 'account' => $this->contexts[$id]['account'] ?? '', 'task' => $this->contexts[$id]['task'] ?? ''], $this->selected);
-        $batch = $preview->create(auth()->user(), ['client' => $this->client, 'template' => $this->template, 'mode' => $this->mode, 'rows' => $rows], $this->requestKey);
+        $batch = $preview->create(auth()->user(), ['template' => $this->template, 'mode' => $this->mode, 'rows' => $rows], $this->requestKey);
         $this->redirectRoute('admin.communications.batches.show', ['batch' => $batch->public_id]);
     }
 
-    public function render(RecipientAccess $access, ClientAccess $clients, CustomerSearch $search, TemplateContext $context): View
+    public function render(RecipientAccess $access, CustomerSearch $search, TemplateContext $context): View
     {
         $access->compose(auth()->user());
         $query = $access->contacts(auth()->user())->whereNull('valid_to')->where('valid_from', '<=', now());
-        if (! Str::isUuid($this->client)) {
-            $query->whereRaw('false');
-        } else {
-            $query->whereHas('debtor.client', fn ($q) => $q->where('public_id', $this->client));
-        }
         if ($this->category !== '') {
             $query->whereHas('debtor.categoryAssignments', fn ($q) => $q->whereNull('revoked_at')->whereHas('category', fn ($q) => $q->where('public_id', Str::isUuid($this->category) ? $this->category : (string) Str::uuid())));
         }
@@ -119,12 +106,12 @@ class Recipients extends Component
                 }
             }
         }
-        $selected = $access->contacts(auth()->user())->whereIn('public_id', array_slice(array_filter($this->selected, fn ($id) => is_string($id) && Str::isUuid($id)), 0, config('communications.preview_max_recipients')))->with('debtor.client')->orderBy('id')->get();
+        $selected = $access->contacts(auth()->user())->whereIn('public_id', array_slice(array_filter($this->selected, fn ($id) => is_string($id) && Str::isUuid($id)), 0, config('communications.preview_max_recipients')))->with('debtor')->orderBy('id')->get();
         $options = [];
         foreach ($selected as $contact) {
             $options[$contact->public_id] = ['accounts' => $context->accounts($contact->debtor)->limit(100)->get(), 'tasks' => Gate::allows('viewAny', Task::class) ? Task::query()->where('customer_id', $contact->debtor_id)->with('account')->latest('id')->limit(100)->get() : collect()];
         }
 
-        return view('livewire.admin.communications.recipients', ['clients' => $clients->clients(auth()->user())->orderBy('name')->get(), 'templates' => CommunicationTemplate::query()->where('channel', 'email')->where('status', 'approved')->orderBy('email_slot')->get(), 'contacts' => $query->with('debtor.client')->orderBy('debtor_id')->orderBy('id')->paginate(25), 'selectedContacts' => $selected, 'contextOptions' => $options, 'categories' => $clients->scope(CustomerCategory::query(), auth()->user())->where('is_active', true)->when(Str::isUuid($this->client), fn ($q) => $q->whereHas('client', fn ($q) => $q->where('public_id', $this->client)))->orderBy('name')->get(), 'batches' => $access->batches(auth()->user())->with('template')->latest('id')->limit(10)->get()]);
+        return view('livewire.admin.communications.recipients', ['templates' => CommunicationTemplate::query()->where('channel', 'email')->where('status', 'approved')->orderBy('email_slot')->get(), 'contacts' => $query->with('debtor')->orderBy('debtor_id')->orderBy('id')->paginate(25), 'selectedContacts' => $selected, 'contextOptions' => $options, 'categories' => CustomerCategory::query()->where('is_active', true)->orderBy('name')->get(), 'batches' => $access->batches(auth()->user())->with('template')->latest('id')->limit(10)->get()]);
     }
 }

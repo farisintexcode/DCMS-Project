@@ -14,7 +14,6 @@ test('service authority review and frozen recipient exclusions remain explicit a
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
     await expect(page).toHaveURL(/\/admin$/);
     await page.goto('/admin/communications/recipients');
-    await page.getByLabel('Recipient client', { exact: true }).selectOption({ label: 'Synthetic Client' });
     await page.getByLabel('Find email contacts', { exact: true }).fill(reference);
     await page.getByRole('button', { name: 'Filter contacts', exact: true }).click();
     await expect(page.getByText('Select email for ' + reference, { exact: true })).toBeVisible();
@@ -40,7 +39,6 @@ test('service authority review and frozen recipient exclusions remain explicit a
     }
     await page.screenshot({ path: '.local-tools/m14-' + surface + '-authority.png', fullPage: true });
     await page.getByRole('link', { name: 'Recipient selection', exact: true }).click();
-    await page.getByLabel('Recipient client', { exact: true }).selectOption({ label: 'Synthetic Client' });
     await page.getByLabel('Approved template version', { exact: true }).selectOption({ label: 'Friendly Payment Reminder · v1.0' });
     await page.getByLabel('Find email contacts', { exact: true }).fill(reference);
     await page.getByRole('button', { name: 'Filter contacts', exact: true }).click();

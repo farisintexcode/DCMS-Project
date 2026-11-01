@@ -29,24 +29,24 @@ class Editor extends Component
 
     public function mount(Debtor $customer, ?DebtAccount $account = null): void
     {
-        abort_unless(Auth::user()->hasClientScope($customer->client), 404);
+        abort_unless(Auth::user()->isActive(), 404);
         Gate::authorize('view', $customer);
         $this->customerId = $customer->id;
         if ($account) {
-            abort_unless($account->client_id === $customer->client_id && $account->parties()->where('debtor_id', $customer->id)->exists(), 404);
+            abort_unless($account->parties()->where('debtor_id', $customer->id)->exists(), 404);
             Gate::authorize('update', $account);
             $this->accountId = $account->id;
             $this->revision = $account->revision();
             $party = $account->parties()->where('debtor_id', $customer->id)->whereNull('valid_to')->whereNull('source_slot')->first();
             $this->data = ['account_number' => $account->account_number, 'billing_reference' => $account->billing_reference ?? '', 'currency' => $account->currency, 'status' => $account->status, 'role_code' => $party?->role_code ?? '', 'address' => $account->property?->address_lines_ciphertext ?? '', 'building' => $account->property?->building ?? '', 'postcode' => $account->property?->postcode ?? '', 'state_code' => $account->property?->state_code ?? ''];
         } else {
-            Gate::authorize('create', [DebtAccount::class, $customer->client]);
+            Gate::authorize('create', DebtAccount::class);
         }
     }
 
     public function save(SaveDebtAccount $save): void
     {
-        $customer = Debtor::query()->with('client')->findOrFail($this->customerId);
+        $customer = Debtor::query()->findOrFail($this->customerId);
         $account = $save->handle(Auth::user(), $customer, $this->data, $this->accountId ? DebtAccount::query()->findOrFail($this->accountId) : null, $this->revision);
         session()->flash('status', 'Account and customer relationship saved.');
         $this->redirectRoute('admin.customers.show', ['customer' => $customer, 'tab' => 'accounts']);
@@ -54,13 +54,13 @@ class Editor extends Component
 
     public function render(): View
     {
-        $customer = Debtor::query()->with('client')->findOrFail($this->customerId);
-        abort_unless(Auth::user()->hasClientScope($customer->client), 404);
+        $customer = Debtor::query()->findOrFail($this->customerId);
+        abort_unless(Auth::user()->isActive(), 404);
         Gate::authorize('view', $customer);
         if ($this->accountId) {
             Gate::authorize('update', DebtAccount::query()->findOrFail($this->accountId));
         } else {
-            Gate::authorize('create', [DebtAccount::class, $customer->client]);
+            Gate::authorize('create', DebtAccount::class);
         }
 
         return view('livewire.admin.accounts.editor', ['customer' => $customer, 'roles' => ReferenceValue::query()->where('category', 'party_role')->where('is_active', true)->get(), 'states' => ReferenceValue::query()->where('category', 'state')->where('is_active', true)->get()]);

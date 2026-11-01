@@ -17,14 +17,14 @@ class AttentionQueue
 {
     public const UNFINISHED_IMPORTS = ['mapping', 'ready', 'failed'];
 
-    public function __construct(private TaskAccess $tasks, private CallAccess $calls, private ClientAccess $clients) {}
+    public function __construct(private TaskAccess $tasks, private CallAccess $calls) {}
 
     /** @return list<array{key: string, label: string, count: int, detail: string, href: string}> */
     public function forUser(User $user): array
     {
         $items = [];
         if (Gate::forUser($user)->allows('viewAny', Task::class)) {
-            $scope = $this->tasks->scope(Task::query(), $user);
+            $scope = Task::query();
             $pending = (clone $scope)->where('work_status', 'submitted')->where('review_status', 'pending');
             $oldest = (clone $pending)->min('submitted_at');
             $items[] = [
@@ -46,7 +46,7 @@ class AttentionQueue
         if (Gate::forUser($user)->allows('viewAny', ImportBatch::class)) {
             $items[] = [
                 'key' => 'unfinished_imports', 'label' => 'Unfinished imports',
-                'count' => $this->clients->scope(ImportBatch::query(), $user)->whereIn('status', self::UNFINISHED_IMPORTS)->count(),
+                'count' => ImportBatch::query()->whereIn('status', self::UNFINISHED_IMPORTS)->count(),
                 'detail' => 'Awaiting mapping, confirmation or a retry', 'href' => route('admin.imports.index'),
             ];
         }

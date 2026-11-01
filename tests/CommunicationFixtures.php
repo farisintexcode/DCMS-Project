@@ -13,7 +13,6 @@ use App\Models\DebtAccount;
 use App\Models\IntegrationAccount;
 use App\Models\Task;
 use App\Models\User;
-use App\Models\UserClientScope;
 use App\Services\Communications\EmailTransport;
 use App\Services\Customers\CustomerSearch;
 use Illuminate\Support\Str;
@@ -50,8 +49,6 @@ function deliveryFixture(int $recipients = 1): array
     $actor = User::factory()->create();
     $actor->assignRole('Admin');
     $actor->givePermissionTo(['templates.approve', 'communication-permission.create', 'communication-permission.approve']);
-    $scope = new UserClientScope;
-    $scope->forceFill(['user_id' => $actor->id, 'client_id' => $task->batch->client_id, 'granted_by' => $actor->id, 'valid_from' => now()->subMinute(), 'reason' => 'Synthetic delivery portfolio'])->save();
     $source = CommunicationTemplate::query()->where('email_slot', 1)->where('status', 'approved')->firstOrFail();
     $manager = app(ManageTemplates::class);
     $draft = $manager->createVersion($actor, $source);
@@ -61,7 +58,7 @@ function deliveryFixture(int $recipients = 1): array
     $rows = [];
     $allowlist = [];
     for ($i = 0; $i < $recipients; $i++) {
-        $current = $i === 0 ? $task : Task::factory()->create(['assignment_batch_id' => $task->assignment_batch_id, 'debt_account_id' => DebtAccount::factory()->create(['client_id' => $task->batch->client_id])->id]);
+        $current = $i === 0 ? $task : Task::factory()->create(['assignment_batch_id' => $task->assignment_batch_id, 'debt_account_id' => DebtAccount::factory()->create()->id]);
         $email = 'delivery-'.$i.'@example.test';
         $allowlist[] = $email;
         $contact = Contact::factory()->create(['debtor_id' => $current->customer_id, 'kind_code' => 'email', 'value_ciphertext' => $email, 'value_fingerprint' => app(CustomerSearch::class)->token('contact:email', $email)]);
@@ -70,7 +67,7 @@ function deliveryFixture(int $recipients = 1): array
         $prefs->review($actor, $pref, 0, 'approved', 'Synthetic checked evidence');
         $rows[] = ['contact' => $contact->public_id, 'account' => $current->account->public_id];
     }
-    $batch = app(PreviewRecipients::class)->create($actor, ['client' => $task->batch->client->public_id, 'template' => $template->public_id, 'mode' => $recipients === 1 ? 'single' : 'bulk', 'rows' => $rows], (string) Str::uuid7());
+    $batch = app(PreviewRecipients::class)->create($actor, ['template' => $template->public_id, 'mode' => $recipients === 1 ? 'single' : 'bulk', 'rows' => $rows], (string) Str::uuid7());
     $account = IntegrationAccount::factory()->create(['status' => 'enabled', 'capability_verified_at' => now(), 'capabilities' => ['account_confirmed' => true, 'sender_verified' => true, 'service_email_approved' => true, 'dkim_verified' => true, 'spf_verified' => true, 'dmarc_verified' => true, 'quota_limit' => 10, 'quota_window_seconds' => 86400, 'rate_per_second' => 2]]);
     $transport = new SyntheticEmailTransport;
     app()->instance(EmailTransport::class, $transport);

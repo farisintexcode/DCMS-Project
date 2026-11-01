@@ -3,7 +3,6 @@
 namespace App\Actions\Communications;
 
 use App\Models\AccountParty;
-use App\Models\Client;
 use App\Models\CommunicationPreference;
 use App\Models\Contact;
 use App\Models\DebtAccount;
@@ -34,8 +33,7 @@ class ManagePreferences
     {
         return DB::transaction(function () use ($actor, $customerId, $input, $key): CommunicationPreference {
             $actor = $actor->fresh();
-            $customer = $this->access->customers($actor)->with('client')->where('public_id', $customerId)->firstOrFail();
-            Client::query()->whereKey($customer->client_id)->lockForUpdate()->firstOrFail();
+            $customer = $this->access->customers($actor)->where('public_id', $customerId)->firstOrFail();
             abort_unless($actor->can('communication-permission.create') || $actor->can('communication-permission.update') || $actor->can('communication-permission.block'), 403);
             Validator::make(['key' => $key], ['key' => ['required', 'uuid']])->validate();
             $prior = CommunicationPreference::query()->where('request_key', $key)->first();
@@ -61,8 +59,8 @@ class ManagePreferences
                 abort_unless(in_array($data['state'], EmailEligibility::Restrictive, true) && $actor->can('communication-permission.block'), 403);
             }
             $contact = empty($data['contact']) ? null : Contact::query()->where('debtor_id', $customer->id)->where('kind_code', 'email')->where('public_id', $data['contact'])->whereNull('valid_to')->firstOrFail();
-            $account = empty($data['account']) ? null : DebtAccount::query()->where('client_id', $customer->client_id)->where('public_id', $data['account'])->whereHas('parties', fn ($q) => $q->where('debtor_id', $customer->id)->whereNull('valid_to'))->firstOrFail();
-            $task = empty($data['task']) ? null : Task::query()->where('customer_id', $customer->id)->where('debt_account_id', $account?->id)->where('public_id', $data['task'])->with('batch.client')->firstOrFail();
+            $account = empty($data['account']) ? null : DebtAccount::query()->where('public_id', $data['account'])->whereHas('parties', fn ($q) => $q->where('debtor_id', $customer->id)->whereNull('valid_to'))->firstOrFail();
+            $task = empty($data['task']) ? null : Task::query()->where('customer_id', $customer->id)->where('debt_account_id', $account?->id)->where('public_id', $data['task'])->with('batch')->firstOrFail();
             if ($task) {
                 Gate::forUser($actor)->authorize('view', $task);
             }
@@ -74,7 +72,7 @@ class ManagePreferences
                 if ($data['basis'] === 'EXPLICIT_SERVICE_CONSENT' && (trim($data['notice_version'] ?? '') === '' || trim($data['consent_method'] ?? '') === '' || empty($data['granted_at']))) {
                     throw ValidationException::withMessages(['notice_version' => 'Record consent notice version, method and grant time.']);
                 }
-                if ($data['basis'] === 'CLIENT_AUTHORIZED_COLLECTION' && (! $task || empty($data['assignment_date']) || trim($data['authority_reference'] ?? '') === '' || $task->batch->status->value !== 'active' || $task->work_status === 'cancelled')) {
+                if ($data['basis'] === 'AUTHORIZED_COLLECTION' && (! $task || empty($data['assignment_date']) || trim($data['authority_reference'] ?? '') === '' || $task->batch->status->value !== 'active' || $task->work_status === 'cancelled')) {
                     throw ValidationException::withMessages(['authority_reference' => 'Record a matching active case, assignment date and communication authority reference.']);
                 }
             }
@@ -97,7 +95,7 @@ class ManagePreferences
                 throw ValidationException::withMessages(['assignment_date' => 'An authorized assignment date cannot be in the future.']);
             }
             $pref = new CommunicationPreference;
-            $pref->forceFill(['client_id' => $customer->client_id, 'customer_id' => $customer->id, 'contact_id' => $contact?->id, 'debt_account_id' => $account?->id, 'task_id' => $task?->id, 'state' => $data['state'], 'basis' => $data['basis'] ?? null, 'evidence_ciphertext' => [...array_intersect_key($data, array_flip(['source', 'reference', 'email_source', 'notes', 'notice_version', 'consent_method', 'granted_at', 'assignment_date', 'authority_reference'])), 'email' => $contact?->value_ciphertext, 'client' => $customer->client->public_id, 'account' => $account?->public_id, 'task' => $task?->public_id], 'reason_ciphertext' => trim($data['reason']), 'effective_at' => $effective, 'expires_at' => $expires, 'recorded_by' => $actor->id, 'request_key' => $key]);
+            $pref->forceFill(['customer_id' => $customer->id, 'contact_id' => $contact?->id, 'debt_account_id' => $account?->id, 'task_id' => $task?->id, 'state' => $data['state'], 'basis' => $data['basis'] ?? null, 'evidence_ciphertext' => [...array_intersect_key($data, array_flip(['source', 'reference', 'email_source', 'notes', 'notice_version', 'consent_method', 'granted_at', 'assignment_date', 'authority_reference'])), 'email' => $contact?->value_ciphertext, 'account' => $account?->public_id, 'task' => $task?->public_id], 'reason_ciphertext' => trim($data['reason']), 'effective_at' => $effective, 'expires_at' => $expires, 'recorded_by' => $actor->id, 'request_key' => $key]);
             $current = $this->scope($pref)->where('is_current', true)->lockForUpdate()->first();
             if ($current) {
                 abort_unless($actor->can('communication-permission.update') || (in_array($pref->state, EmailEligibility::Restrictive, true) && $actor->can('communication-permission.block')), 403);
@@ -128,8 +126,7 @@ class ManagePreferences
             $actor = $actor->fresh();
             $this->access->customers($actor)->whereKey($target->customer_id)->firstOrFail();
             abort_unless($actor->can('communication-permission.approve'), 403);
-            Client::query()->whereKey($target->client_id)->lockForUpdate()->firstOrFail();
-            $pref = CommunicationPreference::query()->with(['contact', 'customer', 'task.batch.client'])->lockForUpdate()->findOrFail($target->id);
+            $pref = CommunicationPreference::query()->with(['contact', 'customer', 'task.batch'])->lockForUpdate()->findOrFail($target->id);
             if ($pref->review_status !== 'pending' || $pref->lock_version !== $version) {
                 throw ValidationException::withMessages(['revision' => 'This request was reviewed or changed. Reload it.']);
             }
@@ -141,7 +138,7 @@ class ManagePreferences
                 abort_unless($actor->can('communication-permission.override'), 403);
             }
             if ($decision === 'approved' && $pref->state === 'allowed') {
-                if ($pref->basis === 'CLIENT_AUTHORIZED_COLLECTION') {
+                if ($pref->basis === 'AUTHORIZED_COLLECTION') {
                     if (! $pref->task || $pref->task->work_status === 'cancelled' || $pref->task->batch->status->value !== 'active') {
                         throw ValidationException::withMessages(['revision' => 'Collection authority is no longer active.']);
                     } Gate::forUser($actor)->authorize('view', $pref->task);

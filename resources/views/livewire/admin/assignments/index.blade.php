@@ -1,6 +1,6 @@
 <section class="grid gap-6">
     <x-feedback />
-    <x-page-header title="Assignment batches" eyebrow="Recovery work packages" description="Organize client assignments, schedules and routing metadata before importing tasks."><x-slot:actions>@can('create', \App\Models\AssignmentBatch::class)<a class="btn btn-primary" href="{{ route('admin.assignments.create') }}"><x-icon name="plus" class="size-4" />New assignment</a>@endcan</x-slot:actions></x-page-header>
+    <x-page-header title="Assignment batches" eyebrow="Recovery work packages" description="Organize assignments, schedules and routing metadata before importing tasks."><x-slot:actions>@can('create', \App\Models\AssignmentBatch::class)<a class="btn btn-primary" href="{{ route('admin.assignments.create') }}"><x-icon name="plus" class="size-4" />New assignment</a>@endcan</x-slot:actions></x-page-header>
     <nav aria-label="Assignment register" class="flex flex-wrap gap-2"><a class="tab-button" href="{{ route('admin.assignments.index') }}" @if($status === 'active') aria-current="page" @endif>Active assignments</a><a class="tab-button" href="{{ route('admin.assignments.index', ['status'=>'archived']) }}" @if($status === 'archived') aria-current="page" @endif>Archived assignments</a></nav>
     <div class="assignment-register grid min-w-0 gap-4">
         <form class="surface grid gap-5 p-4 sm:p-5" wire:submit="applyFilters" x-data="{ filtersOpen: @js($activeFilterCount > 0) }">
@@ -17,8 +17,7 @@
                 </button>
             </div>
             <div id="assignment-filters" class="grid gap-5 border-t border-ink-100 pt-5" x-show="filtersOpen" x-cloak>
-                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-                    <x-select name="filter-client" label="Client" wire:model="draft.client"><option value="">All permitted clients</option>@foreach($clients as $item)<option value="{{ $item->id }}">{{ $item->name }}</option>@endforeach</x-select>
+                <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <x-select name="filter-type" label="Assignment type" wire:model="draft.type"><option value="">All types</option>@foreach($types as $item)<option value="{{ $item->code }}">{{ $item->label }}</option>@endforeach</x-select>
                     <x-select name="filter-state" label="State" wire:model="draft.state"><option value="">All states</option>@foreach($states as $item)<option value="{{ $item->code }}">{{ $item->label }}</option>@endforeach</x-select>
                     <x-input name="filter-from" label="Assignment date from" type="date" class="min-h-11 py-2" wire:model="draft.from" />

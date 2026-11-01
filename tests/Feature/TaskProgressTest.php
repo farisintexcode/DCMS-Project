@@ -21,7 +21,7 @@ beforeEach(function (): void {
 
 function progressTask(AssignmentBatch $batch, ?Staff $rider = null, string $assignedAt = '2026-10-31 02:00:00', array $attributes = []): Task
 {
-    $task = Task::factory()->create(['assignment_batch_id' => $batch->id, 'debt_account_id' => DebtAccount::factory()->create(['client_id' => $batch->client_id])->id, ...$attributes]);
+    $task = Task::factory()->create(['assignment_batch_id' => $batch->id, 'debt_account_id' => DebtAccount::factory()->create()->id, ...$attributes]);
     if ($rider !== null) {
         TaskAllocation::factory()->create(['task_id' => $task->id, 'collector_id' => $rider->id, 'assigned_at' => $assignedAt]);
     }
@@ -30,8 +30,8 @@ function progressTask(AssignmentBatch $batch, ?Staff $rider = null, string $assi
 }
 
 test('progress counts verified completion overall, today and per current Rider allocation', function (): void {
-    [$user, $client] = customerOperator();
-    $batch = AssignmentBatch::factory()->create(['client_id' => $client->id]);
+    $user = staffManager();
+    $batch = AssignmentBatch::factory()->create();
     $busy = Staff::factory()->create(['first_name' => 'Nordin', 'last_name' => 'Rider']);
     $quiet = Staff::factory()->create(['first_name' => 'Alwi', 'last_name' => 'Rider']);
     $completed = ['work_status' => 'completed', 'review_status' => 'approved'];
@@ -60,9 +60,9 @@ test('progress counts verified completion overall, today and per current Rider a
 });
 
 test('the assignment filter narrows the report to one assignment and lists every Rider on it', function (): void {
-    [$user, $client] = customerOperator();
-    $crowded = AssignmentBatch::factory()->create(['client_id' => $client->id]);
-    $small = AssignmentBatch::factory()->create(['client_id' => $client->id]);
+    $user = staffManager();
+    $crowded = AssignmentBatch::factory()->create();
+    $small = AssignmentBatch::factory()->create();
     foreach (range(1, 6) as $ignored) {
         progressTask($crowded, Staff::factory()->create());
     }
@@ -82,8 +82,8 @@ test('the assignment filter narrows the report to one assignment and lists every
 });
 
 test('a local midnight boundary decides which allocations count as today', function (): void {
-    [$user, $client] = customerOperator();
-    $batch = AssignmentBatch::factory()->create(['client_id' => $client->id]);
+    $user = staffManager();
+    $batch = AssignmentBatch::factory()->create();
     $rider = Staff::factory()->create();
     $localMidnight = now()->timezone(config('dcms.business_timezone'))->startOfDay()->utc();
     progressTask($batch, $rider, $localMidnight->copy()->subSecond()->format('Y-m-d H:i:s.uP'));
@@ -93,19 +93,18 @@ test('a local midnight boundary decides which allocations count as today', funct
 });
 
 test('assignment progress lists active assignments with unfinished work, soonest due first', function (): void {
-    [$user, $client] = customerOperator();
+    $user = staffManager();
     $complete = ['work_status' => 'completed', 'review_status' => 'approved'];
-    $pastDue = AssignmentBatch::factory()->create(['client_id' => $client->id, 'name' => 'Past due batch', 'due_date' => '2026-10-29']);
+    $pastDue = AssignmentBatch::factory()->create(['name' => 'Past due batch', 'due_date' => '2026-10-29']);
     progressTask($pastDue, attributes: $complete);
     progressTask($pastDue);
-    $dueSoon = AssignmentBatch::factory()->create(['client_id' => $client->id, 'name' => 'Due soon batch', 'due_date' => '2026-11-03']);
+    $dueSoon = AssignmentBatch::factory()->create(['name' => 'Due soon batch', 'due_date' => '2026-11-03']);
     progressTask($dueSoon);
-    $later = AssignmentBatch::factory()->create(['client_id' => $client->id, 'name' => 'Later batch', 'due_date' => '2026-12-31']);
+    $later = AssignmentBatch::factory()->create(['name' => 'Later batch', 'due_date' => '2026-12-31']);
     progressTask($later);
     progressTask($later, attributes: ['work_status' => 'cancelled']);
-    progressTask(AssignmentBatch::factory()->create(['client_id' => $client->id, 'name' => 'Finished batch']), attributes: $complete);
-    progressTask(AssignmentBatch::factory()->create(['client_id' => $client->id, 'name' => 'Archived batch', 'status' => 'archived']));
-    progressTask(AssignmentBatch::factory()->create(['name' => 'Foreign batch']));
+    progressTask(AssignmentBatch::factory()->create(['name' => 'Finished batch']), attributes: $complete);
+    progressTask(AssignmentBatch::factory()->create(['name' => 'Archived batch', 'status' => 'archived']));
 
     $progress = app(TaskProgress::class)->assignments($user);
 

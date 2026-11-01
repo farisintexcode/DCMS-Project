@@ -3,13 +3,11 @@
 namespace App\Livewire\Admin\Imports;
 
 use App\Actions\Imports\ImportWorkflow;
-use App\Models\Client;
 use App\Models\ColumnAlias;
 use App\Models\ImportBatch;
 use App\Models\ImportField;
 use App\Models\ImportTemplate;
 use App\Services\AuditWriter;
-use App\Services\ClientAccess;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -22,8 +20,6 @@ use Livewire\Component;
 #[Layout('layouts.admin')]
 class Registry extends Component
 {
-    public string $client = '';
-
     public string $kind = 'customer';
 
     public string $field = '';
@@ -34,19 +30,17 @@ class Registry extends Component
     {
         Gate::authorize('viewAny', ImportBatch::class);
         abort_unless(Auth::user()->can('templates.manage') && Auth::user()->can('imports.map'), 403);
-        $this->validate(['client' => ['required', 'integer'], 'kind' => ['required', 'in:customer,assignment_batch'], 'field' => ['required', 'integer'], 'alias' => ['required', 'string', 'max:160']]);
+        $this->validate(['kind' => ['required', 'in:customer,assignment_batch'], 'field' => ['required', 'integer'], 'alias' => ['required', 'string', 'max:160']]);
         DB::transaction(function () use ($audit): void {
-            $client = Client::query()->lockForUpdate()->findOrFail($this->client);
-            abort_unless(Auth::user()->hasClientScope($client), 404);
             $field = ImportField::query()->where('module', $this->kind)->where('is_active', true)->findOrFail($this->field);
             $normalized = ImportWorkflow::normalize($this->alias);
-            Validator::make(['normalized_alias' => $normalized], ['normalized_alias' => ['required', 'string', 'max:160', Rule::unique('column_aliases')->where('module', $this->kind)->where('client_id', $client->id)->where('is_active', true)]])->validate();
+            Validator::make(['normalized_alias' => $normalized], ['normalized_alias' => ['required', 'string', 'max:160', Rule::unique('column_aliases')->where('module', $this->kind)->where('is_active', true)]])->validate();
             $alias = new ColumnAlias;
-            $alias->forceFill(['client_id' => $client->id, 'module' => $this->kind, 'field_id' => $field->id, 'alias' => trim($this->alias), 'normalized_alias' => $normalized])->save();
+            $alias->forceFill(['module' => $this->kind, 'field_id' => $field->id, 'alias' => trim($this->alias), 'normalized_alias' => $normalized])->save();
             $audit->record(Auth::user(), 'import_alias_created', $alias->public_id, ['status' => 'active'], module: 'M04', entityType: 'column_alias');
         });
         $this->alias = '';
-        session()->flash('success', 'Client alias published. Existing reviewed mappings remain pinned.');
+        session()->flash('success', 'Alias published. Existing reviewed mappings remain pinned.');
     }
 
     public function deactivateAlias(string $id, AuditWriter $audit): void
@@ -55,7 +49,6 @@ class Registry extends Component
         abort_unless(Auth::user()->can('templates.manage') && Auth::user()->can('imports.map'), 403);
         DB::transaction(function () use ($id, $audit): void {
             $alias = ColumnAlias::query()->where('public_id', $id)->lockForUpdate()->firstOrFail();
-            abort_unless($alias->client_id && Auth::user()->hasClientScope(Client::query()->findOrFail($alias->client_id)), 404);
             $alias->is_active = false;
             $alias->save();
             $audit->record(Auth::user(), 'import_alias_deactivated', $alias->public_id, ['status' => 'inactive'], module: 'M04', entityType: 'column_alias');
@@ -92,10 +85,10 @@ class Registry extends Component
         });
     }
 
-    public function render(ClientAccess $access): View
+    public function render(): View
     {
         Gate::authorize('viewAny', ImportBatch::class);
 
-        return view('livewire.admin.imports.registry', ['clients' => $access->clients(Auth::user())->get(), 'fields' => ImportField::query()->where('module', $this->kind)->where('is_active', true)->get(), 'aliases' => ColumnAlias::query()->where('module', $this->kind)->where(fn ($q) => $q->whereNull('client_id')->orWhereIn('client_id', $access->clients(Auth::user())->select('id')))->orderByDesc('id')->limit(100)->get(), 'templates' => ImportTemplate::query()->orderBy('code')->orderByDesc('version')->get()]);
+        return view('livewire.admin.imports.registry', ['fields' => ImportField::query()->where('module', $this->kind)->where('is_active', true)->get(), 'aliases' => ColumnAlias::query()->where('module', $this->kind)->orderByDesc('id')->limit(100)->get(), 'templates' => ImportTemplate::query()->orderBy('code')->orderByDesc('version')->get()]);
     }
 }

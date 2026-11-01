@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -50,11 +49,6 @@ class User extends Authenticatable
         return $this->isActive() && ($this->can('admin.access') || $this->canUseRiderInterface());
     }
 
-    public function clientScopes(): HasMany
-    {
-        return $this->hasMany(UserClientScope::class);
-    }
-
     public function isActive(): bool
     {
         return $this->status === AccountStatus::Active && ($this->staff_id === null || $this->staff()->where('is_active', true)->exists());
@@ -63,14 +57,5 @@ class User extends Authenticatable
     public function canUseRiderInterface(): bool
     {
         return $this->isActive() && $this->can('rider.access') && $this->staff()->where('is_active', true)->where('is_rider', true)->exists();
-    }
-
-    public function hasClientScope(Client $client): bool
-    {
-        $instant = now()->format('Y-m-d H:i:s.uP');
-
-        return $this->isActive() && $client->is_active && $this->clientScopes()->where('client_id', $client->id)
-            ->where('valid_from', '<=', $instant)
-            ->where(fn ($query) => $query->whereNull('valid_to')->orWhere('valid_to', '>', $instant))->exists();
     }
 }

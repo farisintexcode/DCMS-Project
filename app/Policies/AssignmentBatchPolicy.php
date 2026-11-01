@@ -3,10 +3,9 @@
 namespace App\Policies;
 
 use App\Models\AssignmentBatch;
-use App\Models\Client;
 use App\Models\User;
 
-/** M03 / UI09–12: permission plus a current, active client portfolio grant. */
+/** M03 / UI09–12: permission-based access. */
 class AssignmentBatchPolicy
 {
     public function viewAny(User $user): bool
@@ -16,12 +15,12 @@ class AssignmentBatchPolicy
 
     public function view(User $user, AssignmentBatch $batch): bool
     {
-        return $this->viewAny($user) && $user->hasClientScope($batch->client);
+        return $this->viewAny($user);
     }
 
-    public function create(User $user, ?Client $client = null): bool
+    public function create(User $user): bool
     {
-        return $this->viewAny($user) && $user->can('assignments.manage') && ($client === null || $user->hasClientScope($client));
+        return $this->viewAny($user) && $user->can('assignments.manage');
     }
 
     public function update(User $user, AssignmentBatch $batch): bool

@@ -8,7 +8,6 @@ use App\Models\Debtor;
 use App\Models\FollowUp;
 use App\Models\Task;
 use App\Models\User;
-use App\Services\ClientAccess;
 use App\Services\Customers\CustomerSearch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Gate;
@@ -17,7 +16,7 @@ use Illuminate\Support\Str;
 /** M11/UI60: current permissions and portfolio scope apply to every query. */
 class CallAccess
 {
-    public function __construct(private ClientAccess $clients, private CustomerSearch $search) {}
+    public function __construct(private CustomerSearch $search) {}
 
     public function allowed(User $actor): bool
     {
@@ -26,14 +25,14 @@ class CallAccess
 
     public function customers(User $actor): Builder
     {
-        return $this->clients->scope(Debtor::query(), $actor);
+        return Debtor::query();
     }
 
     public function customer(User $actor, int $id): Debtor
     {
         abort_unless($this->allowed($actor), 403);
 
-        return $this->customers($actor)->with('client')->findOrFail($id);
+        return $this->customers($actor)->findOrFail($id);
     }
 
     /** Follow-ups on customers in scope; visit follow-ups only for actors who may monitor tasks. */
@@ -54,7 +53,7 @@ class CallAccess
         return $query->where(function ($q) use ($actor): void {
             $q->where('activity_type_code', 'call');
             if (Gate::forUser($actor)->allows('viewAny', Task::class)) {
-                $q->orWhere(fn ($q) => $q->where('activity_type_code', 'visit')->whereHas('task.batch', fn ($q) => $this->clients->scope($q, $actor)));
+                $q->orWhere(fn ($q) => $q->where('activity_type_code', 'visit'));
             }
         });
     }
@@ -62,7 +61,7 @@ class CallAccess
     public function search(User $actor, array $filters): Builder
     {
         $q = $this->customers($actor);
-        foreach (['client', 'category', 'rider'] as $field) {
+        foreach (['category', 'rider'] as $field) {
             $value = $filters[$field] ?? '';
             if ($value === '') {
                 continue;
@@ -72,9 +71,7 @@ class CallAccess
 
                 continue;
             }
-            if ($field === 'client') {
-                $q->whereHas('client', fn ($b) => $b->where('public_id', $value));
-            } elseif ($field === 'category') {
+            if ($field === 'category') {
                 $q->whereHas('categoryAssignments', fn ($b) => $b->whereNull('revoked_at')->whereHas('category', fn ($b) => $b->where('public_id', $value)));
             } elseif (Gate::forUser($actor)->allows('viewAny', Task::class)) {
                 $q->whereIn('id', Task::query()->select('customer_id')->whereHas('currentAllocation.collector', fn ($b) => $b->where('public_id', $value)));

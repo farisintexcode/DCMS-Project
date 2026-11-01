@@ -5,21 +5,18 @@ namespace App\Services\Tasks;
 use App\Models\AssignmentBatch;
 use App\Models\Task;
 use App\Models\User;
-use App\Services\ClientAccess;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 
 /**
- * Dashboard progress over non-cancelled tasks in the actor's client scope.
+ * Dashboard progress over non-cancelled tasks.
  * Complete means verified (completed and approved); "today" means currently allocated to a Rider today, business timezone.
  */
 class TaskProgress
 {
     private const COMPLETE = "tasks.work_status = 'completed' and tasks.review_status = 'approved'";
-
-    public function __construct(private TaskAccess $access, private ClientAccess $clients) {}
 
     /**
      * @return array{total: int, complete: int, outstanding: int, completionRate: float, today: int, completeToday: int, outstandingToday: int, todayCompletionRate: float, riders: Collection<int, object{name: string, staff_no: string, total: int, complete: int, outstanding: int, assigned_today: int}>, riderCount: int}|null
@@ -81,7 +78,7 @@ class TaskProgress
         }
 
         $today = now()->timezone(config('dcms.business_timezone'))->startOfDay();
-        $open = $this->clients->scope(AssignmentBatch::query(), $user)->where('status', 'active')
+        $open = AssignmentBatch::query()->where('status', 'active')
             ->whereHas('tasks', fn ($q) => $q->whereNotIn('work_status', ['completed', 'cancelled']));
         $items = (clone $open)->select(['id', 'public_id', 'name', 'external_reference', 'due_date'])->withCount([
             'tasks as total_tasks' => fn ($q) => $q->where('work_status', '!=', 'cancelled'),
@@ -102,7 +99,7 @@ class TaskProgress
 
     private function tasks(User $user): Builder
     {
-        return $this->access->scope(Task::query(), $user)->where('tasks.work_status', '!=', 'cancelled');
+        return Task::query()->where('tasks.work_status', '!=', 'cancelled');
     }
 
     private function allocated(Builder $tasks, string $join): Builder

@@ -14,7 +14,6 @@ use App\Models\FollowUp;
 use App\Models\ReferenceValue;
 use App\Models\Task;
 use App\Models\User;
-use App\Models\UserClientScope;
 use App\Services\Calls\CallAccess;
 use App\Services\Customers\CustomerSearch;
 use Database\Seeders\DatabaseSeeder;
@@ -35,9 +34,8 @@ beforeEach(function (): void {
 
 function callFixture(): array
 {
-    [$actor, $client] = customerOperator();
-    UserClientScope::query()->where('user_id', $actor->id)->update(['valid_from' => now()->subMinute()]);
-    $customer = Debtor::factory()->create(['client_id' => $client->id]);
+    $actor = staffManager();
+    $customer = Debtor::factory()->create();
     $phone = '+60123456789';
     $contact = Contact::factory()->create(['debtor_id' => $customer->id, 'kind_code' => 'mobile', 'value_ciphertext' => $phone, 'value_fingerprint' => app(CustomerSearch::class)->token('contact:mobile', $phone)]);
 
@@ -49,13 +47,12 @@ function recordTestCall(User $actor, Debtor $customer, array $extra = [], ?strin
     return app(RecordCall::class)->handle($actor, $customer, array_replace(['historical' => false, 'outcome' => 'answered', 'remarks' => 'Synthetic call discussion'], $extra), $key ?? (string) Str::uuid7());
 }
 
-test('call routes enforce permissions and current client scope', function (): void {
+test('call routes enforce permissions', function (): void {
     [$actor, $customer] = callFixture();
     $this->get(route('admin.calls.index'))->assertRedirect(route('login'));
     $this->actingAs($actor)->get(route('admin.calls.index'))->assertOk()->assertSee('Call Centre');
     $this->get(route('admin.calls.show', $customer))->assertOk()->assertSee('Record outgoing call');
     $this->get(route('admin.calls.follow-ups'))->assertOk();
-    $this->get(route('admin.calls.show', Debtor::factory()->create()))->assertNotFound();
     $actor->syncRoles([]);
     $actor->givePermissionTo(['admin.access', 'customers.view']);
     $this->get(route('admin.calls.index'))->assertForbidden();
@@ -122,9 +119,6 @@ test('pending reminders reject context changes and nonowners but permit owner ca
     $follow = recordTestCall($actor, $customer, ['follow_up_at' => now()->addDay()->timezone('Asia/Kuala_Lumpur')->format('Y-m-d\TH:i')])->followUps()->firstOrFail();
     $other = User::factory()->create();
     $other->assignRole('Admin');
-    $scope = UserClientScope::query()->where('user_id', $actor->id)->first()->replicate(['public_id']);
-    $scope->user_id = $other->id;
-    $scope->save();
     expect(fn () => app(ResolveFollowUp::class)->handle($other, $follow, 0, 'done', 'Unauthorized'))->toThrow(HttpException::class);
     expect(fn () => DB::transaction(fn () => DB::table('follow_ups')->where('id', $follow->id)->update(['activity_id' => null])))->toThrow(QueryException::class);
     $cancelled = app(ResolveFollowUp::class)->handle($actor, $follow, 0, 'cancelled', 'No further callback required');
@@ -152,11 +146,8 @@ test('call search uses current references phones task and account context and fa
     foreach ([['reference', $customer->customer_reference], ['contact', '+60123456789']] as [$kind, $query]) {
         expect($access->search($actor, ['searchBy' => $kind, 'query' => $query])->pluck('id')->all())->toBe([$customer->id]);
     }
-    expect($access->search($actor, ['searchBy' => 'identifier'])->count())->toBe(0)->and($access->search($actor, ['client' => 'invalid'])->count())->toBe(0);
+    expect($access->search($actor, ['searchBy' => 'identifier'])->count())->toBe(0);
     $task = Task::factory()->create()->refresh();
-    $scope = UserClientScope::query()->where('user_id', $actor->id)->first()->replicate(['public_id']);
-    $scope->client_id = $task->batch->client_id;
-    $scope->save();
     foreach ([['task', $task->public_id], ['account', $task->account->account_number]] as [$kind, $query]) {
         expect($access->search($actor->fresh(), ['searchBy' => $kind, 'query' => $query])->pluck('id')->all())->toBe([$task->customer_id]);
     }
@@ -176,23 +167,18 @@ test('shared promise remains a visit outcome and call-only options have explicit
     expect(ReferenceValue::query()->where('category', 'activity_outcome')->where('code', 'answered')->firstOrFail()->metadata['activity_types'])->toBe(['call']);
 });
 
-test('call replay rechecks expired client scope and active outcome configuration', function (): void {
+test('calls recheck active outcome configuration', function (): void {
     [$actor, $customer] = callFixture();
     $key = (string) Str::uuid7();
     recordTestCall($actor, $customer, [], $key);
     ReferenceValue::query()->where('category', 'activity_outcome')->where('code', 'answered')->update(['is_active' => false]);
     expect(fn () => recordTestCall($actor, $customer))->toThrow(ValidationException::class);
-    UserClientScope::query()->where('user_id', $actor->id)->update(['valid_to' => now()]);
-    expect(fn () => recordTestCall($actor, $customer, [], $key))->toThrow(ModelNotFoundException::class);
     expect(CollectionActivity::query()->count())->toBe(1);
 });
 
 test('linked calls require task access and keep the selected phone snapshot after contact correction', function (): void {
     [$actor, $customer, $contact] = callFixture();
     $task = Task::factory()->create()->refresh();
-    $scope = UserClientScope::query()->where('user_id', $actor->id)->first()->replicate(['public_id']);
-    $scope->client_id = $task->batch->client_id;
-    $scope->save();
     $call = recordTestCall($actor, $task->customer, ['task' => $task->public_id]);
     expect($call->task_id)->toBe($task->id);
     $this->actingAs($actor);

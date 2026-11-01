@@ -11,6 +11,6 @@ class CommunicationPreferenceFactory extends Factory
 {
     public function definition(): array
     {
-        return ['customer_id' => Debtor::factory(), 'client_id' => fn ($a) => Debtor::query()->findOrFail($a['customer_id'])->client_id, 'state' => 'unknown', 'evidence_ciphertext' => ['source' => 'synthetic', 'reference' => 'TEST-ONLY', 'email_source' => 'synthetic'], 'reason_ciphertext' => 'Synthetic evidence request', 'effective_at' => now(), 'recorded_by' => User::factory(), 'request_key' => (string) Str::uuid7()];
+        return ['customer_id' => Debtor::factory(), 'state' => 'unknown', 'evidence_ciphertext' => ['source' => 'synthetic', 'reference' => 'TEST-ONLY', 'email_source' => 'synthetic'], 'reason_ciphertext' => 'Synthetic evidence request', 'effective_at' => now(), 'recorded_by' => User::factory(), 'request_key' => (string) Str::uuid7()];
     }
 }

@@ -6,7 +6,7 @@
 <h2 class="text-lg font-semibold">Prepare a letter</h2>
 @if($canGenerate)
 <form wire:submit="selectCustomer" class="grid gap-4"><x-input name="customerReference" label="Exact customer reference" wire:model="customerReference" maxlength="100" required /><x-button variant="secondary" wire:loading.attr="disabled">Find customer</x-button></form>
-@if($customer)<div class="rounded-xl bg-brand-soft p-4"><p class="font-semibold break-words">{{ $customer->display_name_ciphertext }}</p><p class="mt-2 text-xs">{{ $customer->customer_reference }} · {{ $customer->client->name }}</p></div>@endif
+@if($customer)<div class="rounded-xl bg-brand-soft p-4"><p class="font-semibold break-words">{{ $customer->display_name_ciphertext }}</p><p class="mt-2 text-xs">{{ $customer->customer_reference }}</p></div>@endif
 <form wire:submit="preview" class="grid gap-4">
 <x-select name="templateId" label="Approved template" wire:model.live="templateId" required><option value="">Choose an approved option</option>@foreach($templates as $template)<option value="{{ $template->public_id }}">{{ $template->name }} · v{{ $template->version }}.0</option>@endforeach</x-select>
 @if($customer)

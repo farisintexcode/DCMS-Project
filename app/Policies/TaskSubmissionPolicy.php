@@ -16,7 +16,7 @@ class TaskSubmissionPolicy
 
     public function view(User $user, TaskSubmission $submission): bool
     {
-        return $this->viewAny($user) && $user->hasClientScope($submission->task->batch->client);
+        return $this->viewAny($user);
     }
 
     public function decide(User $user, TaskSubmission $submission): bool

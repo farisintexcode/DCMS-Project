@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Models\Client;
 use App\Services\Customers\CustomerSearch;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -12,6 +11,6 @@ class DebtorFactory extends Factory
     {
         $name = fake()->name();
 
-        return ['client_id' => Client::factory(), 'customer_reference' => fake()->unique()->bothify('C-########'), 'party_type' => 'person', 'display_name_ciphertext' => $name, 'search_tokens' => app(CustomerSearch::class)->names($name), 'status' => 'active'];
+        return ['customer_reference' => fake()->unique()->bothify('C-########'), 'party_type' => 'person', 'display_name_ciphertext' => $name, 'search_tokens' => app(CustomerSearch::class)->names($name), 'status' => 'active'];
     }
 }

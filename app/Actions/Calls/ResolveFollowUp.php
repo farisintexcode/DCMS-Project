@@ -2,7 +2,6 @@
 
 namespace App\Actions\Calls;
 
-use App\Models\Client;
 use App\Models\Debtor;
 use App\Models\FollowUp;
 use App\Models\User;
@@ -26,7 +25,6 @@ class ResolveFollowUp
 
         return DB::transaction(function () use ($actor, $target, $version, $decision, $remarks): FollowUp {
             $customer = Debtor::query()->findOrFail($target->customer_id);
-            Client::query()->lockForUpdate()->findOrFail($customer->client_id);
             $actor = $actor->fresh();
             $this->access->customer($actor, $customer->id);
             Debtor::query()->whereKey($customer->id)->lockForUpdate()->firstOrFail();

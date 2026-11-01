@@ -58,7 +58,7 @@ class EmailEligibility
         if (! in_array($pref->basis, config('communications.basis_codes'), true) || empty($evidence['source']) || empty($evidence['reference']) || empty($evidence['email_source']) || $this->canonical($evidence['email'] ?? '') !== $email) {
             return ['code' => 'incomplete_basis_evidence', 'preference' => $pref->public_id];
         }
-        if ($pref->basis === 'CLIENT_AUTHORIZED_COLLECTION' && (! $pref->task_id || ($taskId !== null && $pref->task_id !== $taskId) || ! Task::query()->whereKey($pref->task_id)->where('customer_id', $contact->debtor_id)->where('debt_account_id', $accountId)->where('work_status', '<>', 'cancelled')->whereHas('batch', fn ($q) => $q->where('status', 'active'))->exists())) {
+        if ($pref->basis === 'AUTHORIZED_COLLECTION' && (! $pref->task_id || ($taskId !== null && $pref->task_id !== $taskId) || ! Task::query()->whereKey($pref->task_id)->where('customer_id', $contact->debtor_id)->where('debt_account_id', $accountId)->where('work_status', '<>', 'cancelled')->whereHas('batch', fn ($q) => $q->where('status', 'active'))->exists())) {
             return ['code' => 'missing_authorized_case', 'preference' => $pref->public_id];
         }
 

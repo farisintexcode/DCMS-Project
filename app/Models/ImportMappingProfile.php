@@ -19,11 +19,6 @@ class ImportMappingProfile extends Model
         return ['mapping_definition' => 'array', 'is_active' => 'boolean', 'version' => 'integer'];
     }
 
-    public function client(): BelongsTo
-    {
-        return $this->belongsTo(Client::class);
-    }
-
     public function template(): BelongsTo
     {
         return $this->belongsTo(ImportTemplate::class, 'template_id');
