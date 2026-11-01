@@ -48,7 +48,7 @@ test('assignment metadata editing and confirmed archival preserve usable desktop
     await page.screenshot({ path: test.info().outputPath('archived-assignment.png'), fullPage: true });
     await page.goto('/admin/assignments?status=archived');
     await page.getByLabel('Search assignments', { exact: true }).fill(`000-${test.info().project.name}`);
-    await expect(page.getByText('1 matching assignments', { exact: false })).toBeVisible();
+    await expect(page.getByText('Showing 1 to 1 of 1 entries', { exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: `Updated ${name}`, exact: true }).filter({ visible: true })).toBeVisible();
     await page.screenshot({ path: test.info().outputPath('assignment-register.png'), fullPage: true });
 });

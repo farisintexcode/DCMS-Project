@@ -8,6 +8,7 @@ use Database\Factories\AssignmentBatchFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AssignmentBatch extends Model
 {
@@ -41,5 +42,10 @@ class AssignmentBatch extends Model
     public function state(): BelongsTo
     {
         return $this->belongsTo(ReferenceValue::class, 'state_code', 'code')->where('category', 'state');
+    }
+
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(Task::class);
     }
 }

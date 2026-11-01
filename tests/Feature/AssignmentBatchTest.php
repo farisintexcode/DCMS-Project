@@ -12,6 +12,7 @@ use App\Models\DebtAccount;
 use App\Models\ImportBatch;
 use App\Models\ReferenceValue;
 use App\Models\Task;
+use App\Models\TaskAllocation;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -144,6 +145,27 @@ test('literal search safe filters and archive register do not leak other records
     Livewire::actingAs($user)->test(Index::class)->set('query', '%')->assertSee('Percent 100% package')->assertDontSee('Other package')
         ->set('client', 'not-an-id')->assertDontSee('Percent 100% package')->set('client', '')->set('from', 'invalid')->assertSee('format');
     Livewire::actingAs($user)->test(Index::class)->set('query', '')->set('status', 'archived')->set('sort', 'name; drop table users')->assertSee('Other package')->assertDontSee('Percent 100% package');
+});
+
+test('register applies draft filters on demand combines them with search and counts batch tasks', function (): void {
+    [$user, $client] = customerOperator();
+    $counted = AssignmentBatch::factory()->for($client)->create(['name' => 'Counted package', 'start_date' => '2026-10-05', 'due_date' => '2026-10-30']);
+    AssignmentBatch::factory()->for($client)->create(['name' => 'Later package', 'start_date' => '2026-11-05', 'due_date' => '2026-11-30']);
+    $account = DebtAccount::factory()->create(['client_id' => $client->id]);
+    $tasks = Task::factory()->count(3)->create(['assignment_batch_id' => $counted->id, 'debt_account_id' => $account->id]);
+    $tasks[0]->forceFill(['payment_update_flag' => true])->save();
+    TaskAllocation::factory()->create(['task_id' => $tasks[1]->id]);
+
+    Livewire::actingAs($user)->test(Index::class)
+        ->assertViewHas('batches', fn ($batches): bool => $batches->firstWhere('id', $counted->id)->only(['upload_count', 'assigned_count', 'completed_count', 'payment_update_count']) === ['upload_count' => 3, 'assigned_count' => 1, 'completed_count' => 0, 'payment_update_count' => 1])
+        ->set('draft.from', '2026-11-01')->assertSet('from', '')->assertSee('Counted package')
+        ->call('applyFilters')->assertSet('from', '2026-11-01')->assertSee('Later package')->assertDontSee('Counted package')
+        ->set('query', (string) $counted->id)->assertSee('No assignments found')
+        ->call('resetAdvancedFilters')->assertSet('draft.from', '')->assertSee('Counted package')->assertDontSee('Later package')
+        ->call('resetFilters')->assertSet('query', '')->assertSee('Later package')
+        ->set('sort', 'oldest')->assertSeeInOrder(['Counted package', 'Later package'])
+        ->call('sortBy', 'name')->assertSet('sort', 'name_asc')->call('sortBy', 'name')->assertSet('sort', 'name_desc')
+        ->set('perPage', '10')->assertViewHas('batches', fn ($batches): bool => $batches->perPage() === 10);
 });
 
 test('batch client is immutable and PostgreSQL enforces dates references and lookup categories', function (): void {
