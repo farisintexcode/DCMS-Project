@@ -58,6 +58,30 @@ test('batch validation refuses invalid metadata atomically', function (array $ch
     [['dca_code' => ['bad']], 'dca_code'], [['description' => str_repeat('x', 5001)], 'description'],
 ]);
 
+test('the new assignment form follows the operational field scheme and fills the single client and assignment date', function (): void {
+    $this->travelTo('2026-11-01 04:00:00');
+    [$user, $client] = customerOperator();
+
+    Livewire::actingAs($user)->test(Editor::class)
+        ->assertSet('data.client_id', (string) $client->id)->assertSet('data.start_date', '2026-11-01')->assertSet('status', 'active')
+        ->assertDontSee('Commissioning client')->assertDontSee('External batch reference')
+        ->assertSeeInOrder(['Assignment type', 'Assignment name', 'Assignment due date', 'Description (optional)', 'DCA code', 'DCA name', 'LA name', 'State', 'Status'])
+        ->assertSeeInOrder(['Vacant', 'Domestic DR', 'Domestic CTOS', 'Domestic LOD', 'Domestic LOD CTOS', 'COM DR', 'COM LOD']);
+});
+
+test('a new assignment can start archived but saving an existing one never changes its status', function (): void {
+    [$user, $client] = customerOperator();
+    Livewire::actingAs($user)->test(Editor::class)->set('data', batchInput($client))->set('status', 'archived')->call('save')->assertHasNoErrors();
+    $archived = AssignmentBatch::query()->firstOrFail();
+    expect($archived->status)->toBe(BatchStatus::Archived)->and($archived->archived_at)->not->toBeNull()
+        ->and(AuditLog::query()->where('action', 'assignment_created')->firstOrFail()->toJson())->toContain('archived');
+
+    $active = app(SaveAssignmentBatch::class)->handle($user, batchInput($client, ['external_reference' => 'B-2']));
+    app(SaveAssignmentBatch::class)->handle($user, batchInput($client, ['external_reference' => 'B-2', 'name' => 'Renamed']), $active, 0, 'archived');
+    expect($active->fresh()->status)->toBe(BatchStatus::Active)->and($active->fresh()->name)->toBe('Renamed');
+    Livewire::actingAs($user)->test(Editor::class)->set('data', batchInput($client, ['external_reference' => 'B-3']))->set('status', 'deleted')->call('save')->assertHasErrors('status');
+});
+
 test('external references are unique within the client including archives while null references can repeat', function (): void {
     [$user, $client] = customerOperator();
     $save = app(SaveAssignmentBatch::class);

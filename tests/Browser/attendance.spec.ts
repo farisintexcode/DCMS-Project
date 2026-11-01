@@ -23,7 +23,13 @@ test('Rider clocks a real shift, requests correction and Admin independently app
     await page.getByRole('button',{name:'Clock Out',exact:true}).click();
     await expect(page.getByRole('status').filter({hasText:'Clock out saved at'})).toBeVisible({timeout:30000});
     await expect(page.getByRole('button',{name:'Clock In',exact:true})).toHaveCount(0);
+    await expect(page.getByRole('link',{name:'History',exact:true})).toHaveAttribute('href','#attendance-history');
+    await expect(page.getByRole('navigation',{name:'Rider navigation',exact:true}).getByRole('link',{name:'Attendance',exact:true})).toHaveAttribute('aria-current','page');
     await page.getByLabel('History from',{exact:true}).fill(localDate(-3));
+    await page.getByLabel('History through',{exact:true}).fill(localDate(-1));
+    await page.getByRole('button',{name:'View history',exact:true}).click();
+    await expect(page.locator('#attendance-history article').filter({hasText:localDate()})).toHaveCount(0);
+    await page.getByLabel('History through',{exact:true}).fill(localDate());
     await page.getByRole('button',{name:'View history',exact:true}).click();
     const historical=page.locator('article').filter({hasText:localDate(-2)});
     await historical.getByRole('button',{name:'Request correction',exact:true}).click();

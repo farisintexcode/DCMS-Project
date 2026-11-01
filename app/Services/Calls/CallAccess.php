@@ -5,6 +5,7 @@ namespace App\Services\Calls;
 use App\Models\AccountParty;
 use App\Models\CollectionActivity;
 use App\Models\Debtor;
+use App\Models\FollowUp;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\ClientAccess;
@@ -33,6 +34,17 @@ class CallAccess
         abort_unless($this->allowed($actor), 403);
 
         return $this->customers($actor)->with('client')->findOrFail($id);
+    }
+
+    /** Follow-ups on customers in scope; visit follow-ups only for actors who may monitor tasks. */
+    public function followUps(User $actor): Builder
+    {
+        return FollowUp::query()->whereIn('customer_id', $this->customers($actor)->select('debtors.id'))->where(function ($q) use ($actor): void {
+            $q->whereHas('activity', fn ($q) => $q->where('activity_type_code', 'call'));
+            if (Gate::forUser($actor)->allows('viewAny', Task::class)) {
+                $q->orWhereHas('activity', fn ($q) => $q->where('activity_type_code', 'visit'));
+            }
+        });
     }
 
     public function activities(User $actor, Debtor $customer): Builder

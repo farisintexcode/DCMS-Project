@@ -76,8 +76,17 @@ class RiderWork
             foreach (['business_type', 'business_nature', 'business_status'] as $field) {
                 $rules[$field] = [(($policy['business_required'] ?? false) || ($input['business_applicable'] ?? false)) ? 'required' : 'nullable', Rule::exists('reference_values', 'code')->where('category', $field)->where('is_active', true)];
             }
+            foreach (['dr_code' => 'dr_code', 'usage' => 'property_usage', 'property_type' => 'property_type'] as $field => $category) {
+                $rules[$field] = ['nullable', Rule::exists('reference_values', 'code')->where('category', $category)->where('is_active', true)];
+            }
+            $rules['usage_other'] = ['nullable', 'string', 'max:2000'];
             if (($input['signboard_available'] ?? '') === '') {
                 $input['signboard_available'] = null;
+            }
+            foreach (['business_type', 'business_nature', 'business_status', 'dr_code', 'usage', 'property_type'] as $field) {
+                if (($input[$field] ?? null) === '') {
+                    $input[$field] = null;
+                }
             }
             $data = Validator::make($input, $rules)->validate();
             $outcome = ReferenceValue::query()->where('category', 'activity_outcome')->where('code', $data['outcome'])->firstOrFail();
@@ -133,9 +142,9 @@ class RiderWork
             if ($backdated) {
                 $this->audit->record($actor, 'visit_backdated', $activity->public_id, ['status' => 'backdated'], module: 'M06', entityType: 'activity');
             }
-            if (count($selected) === 3) {
+            if (count($selected) === 3 || ! empty($data['dr_code']) || ! empty($data['usage']) || ! empty($data['property_type'])) {
                 $inspection = new PropertyInspection;
-                $inspection->forceFill(['task_id' => $task->id, 'activity_id' => $activity->id, 'property_id' => $task->account->property_id, 'observed_at' => $time, 'business_type_code' => $data['business_type'], 'business_nature_code' => $data['business_nature'], 'business_status_code' => $data['business_status'], 'business_other_ciphertext' => trim($data['business_other'] ?? '') ?: null, 'shop_company_ciphertext' => trim($data['shop_name'] ?? '') ?: null])->save();
+                $inspection->forceFill(['task_id' => $task->id, 'activity_id' => $activity->id, 'property_id' => $task->account->property_id, 'observed_at' => $time, 'business_type_code' => $data['business_type'] ?? null, 'business_nature_code' => $data['business_nature'] ?? null, 'business_status_code' => $data['business_status'] ?? null, 'dr_code' => $data['dr_code'] ?? null, 'usage_code' => $data['usage'] ?? null, 'property_type_code' => $data['property_type'] ?? null, 'usage_other' => $data['usage_other'] ?? null, 'business_other_ciphertext' => trim($data['business_other'] ?? '') ?: null, 'shop_company_ciphertext' => trim($data['shop_name'] ?? '') ?: null])->save();
             }
             if (! empty($data['follow_up_due'])) {
                 $due = Carbon::createFromFormat('!Y-m-d\TH:i', $data['follow_up_due'], config('dcms.business_timezone'))->utc();

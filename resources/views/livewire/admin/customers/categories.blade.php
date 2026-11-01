@@ -1,7 +1,7 @@
 <section class="grid gap-6">
     <x-feedback />
-    <x-page-header title="Customer categories" eyebrow="Portfolio organization" description="Create meaningful groups and manage customer memberships without losing history."><x-slot:actions><a href="{{ route('admin.customers.index') }}" class="btn btn-secondary"><x-icon name="arrow-left" class="size-4" />Back to customers</a></x-slot:actions></x-page-header>
-    @if($clients->isEmpty())<x-empty-state icon="shield" title="No client portfolio access" message="No client portfolio access is currently granted. Ask an authorized administrator to grant access." />@else
+    <x-page-header title="Customer categories" eyebrow="Portfolio organization" description="Create meaningful groups and manage customer memberships without losing history." />
+    @if($clients->isEmpty())<x-empty-state icon="shield" title="Create a client first" message="Categories belong to a client. Create a client, or ask an authorized administrator to grant you access to one.">@can('scopes.manage')<a href="{{ route('admin.customers.clients') }}" class="btn btn-primary"><x-icon name="plus" class="size-4" />Create client</a>@endcan</x-empty-state>@else
     @if($membershipCategory)
     <form wire:submit="applyMemberships" class="surface grid gap-5 border-brand-primary/60 p-5 sm:p-7">
         <div class="flex flex-wrap items-center justify-between gap-3"><div><p class="eyebrow">Bulk membership</p><h2 class="mt-2 text-lg font-semibold">Manage members: {{ $membershipCategory->name }}</h2></div><x-badge tone="brand">{{ count($selectedCustomers) }} selected</x-badge></div>

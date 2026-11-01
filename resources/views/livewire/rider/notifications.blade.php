@@ -1,5 +1,5 @@
 <section class="rider-page"><x-feedback />
-<x-page-header title="Notifications" eyebrow="Your work updates" description="Task review and attendance correction updates, in one place." />
+<x-page-header title="Notifications" eyebrow="" description="Task review and attendance correction updates, in one place." />
 <div class="rider-notification-list">
 @forelse($notifications as $notification)
 <article class="surface rider-notification-card" wire:key="rider-notification-{{ $notification->id }}"><span class="rider-record-icon"><x-icon :name="$notification->type===\App\Notifications\AttendanceCorrected::class?'clock':'shield'" /></span><div class="min-w-0 flex-1"><div class="flex flex-wrap items-center justify-between gap-2"><h2 class="text-sm font-semibold">{{ $notification->type===\App\Notifications\AttendanceCorrected::class?'Attendance update':'Task review' }}</h2><time class="text-[11px] text-ink-500">{{ $notification->created_at->timezone(config('dcms.business_timezone'))->format('d M · H:i') }} MYT</time></div><p class="mt-2 text-sm leading-6 text-ink-600">{{ $notification->data['message'] }}</p>

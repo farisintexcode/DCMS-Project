@@ -21,6 +21,9 @@ use Livewire\Component;
 #[Layout('layouts.admin')]
 class Editor extends Component
 {
+    /** Operational order of assignment types; any others follow alphabetically. */
+    private const TYPE_ORDER = ['vacant', 'domestic_dr', 'domestic_ctos', 'domestic_lod', 'domestic_lod_ctos', 'com_dr', 'com_lod'];
+
     #[Locked]
     public ?int $batchId = null;
 
@@ -29,12 +32,19 @@ class Editor extends Component
 
     public array $data = ['client_id' => '', 'name' => '', 'external_reference' => '', 'type_code' => '', 'start_date' => '', 'due_date' => '', 'description' => '', 'dca_code' => '', 'dca_name' => '', 'la_name' => '', 'state_code' => ''];
 
+    public string $status = 'active';
+
     public string $reason = '';
 
     public function mount(?AssignmentBatch $batch = null): void
     {
         if (! $batch?->exists) {
             Gate::authorize('create', AssignmentBatch::class);
+            $this->data['start_date'] = now()->timezone(config('dcms.business_timezone'))->toDateString();
+            $clients = app(ClientAccess::class)->clients(Auth::user())->limit(2)->pluck('id');
+            if ($clients->count() === 1) {
+                $this->data['client_id'] = (string) $clients->first();
+            }
 
             return;
         }
@@ -50,7 +60,7 @@ class Editor extends Component
 
     public function save(SaveAssignmentBatch $save): void
     {
-        $batch = $save->handle(Auth::user(), $this->data, $this->batchId ? AssignmentBatch::query()->findOrFail($this->batchId) : null, $this->version);
+        $batch = $save->handle(Auth::user(), $this->data, $this->batchId ? AssignmentBatch::query()->findOrFail($this->batchId) : null, $this->version, $this->status);
         session()->flash('status', 'Assignment saved. No tasks were uploaded or allocated.');
         $this->redirectRoute('admin.assignments.edit', ['batch' => $batch->public_id]);
     }
@@ -75,10 +85,14 @@ class Editor extends Component
             Gate::authorize('create', AssignmentBatch::class);
         }
         $references = fn (string $category, ?string $current) => ReferenceValue::query()->where('category', $category)->where(fn ($q) => $q->where('is_active', true)->when($current, fn ($q) => $q->orWhere('code', $current)))->orderBy('label')->get();
+        $typeOrder = array_flip(self::TYPE_ORDER);
+        $clients = $access->clients(Auth::user())->orderBy('name')->get();
 
         return view('livewire.admin.assignments.editor', [
-            'batch' => $batch, 'clients' => $access->clients(Auth::user())->orderBy('name')->get(),
-            'types' => $references('assignment_type', $batch?->type_code), 'states' => $references('state', $batch?->state_code),
+            'batch' => $batch, 'clients' => $clients, 'showClientPicker' => $batch !== null || $clients->count() > 1,
+            'today' => now()->timezone(config('dcms.business_timezone'))->toDateString(),
+            'types' => $references('assignment_type', $batch?->type_code)->sortBy(fn (ReferenceValue $type): int => $typeOrder[$type->code] ?? count($typeOrder))->values(),
+            'states' => $references('state', $batch?->state_code),
             'readOnly' => $batch && ($batch->status === BatchStatus::Archived || ! Gate::allows('update', $batch)),
             'work' => $batch ? $work->summary($batch) : null,
             'activity' => $batch ? AuditLog::query()->where('module', 'M03')->where('entity_type', 'assignment_batch')->where('entity_id', $batch->public_id)->with('actor:id,name')->orderByDesc('id')->limit(10)->get() : collect(),

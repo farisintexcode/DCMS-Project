@@ -4,6 +4,7 @@ use App\Http\Controllers\AttendanceExportController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\SessionController;
 use App\Http\Controllers\LetterDownloadController;
+use App\Http\Controllers\ProfilePhotoController;
 use App\Http\Controllers\ReportDownloadController;
 use App\Http\Controllers\SesNotificationController;
 use App\Http\Controllers\TaskProofController;
@@ -17,6 +18,7 @@ use App\Livewire\Admin\Communications\Preferences;
 use App\Livewire\Admin\Communications\Receipts;
 use App\Livewire\Admin\Communications\Recipients;
 use App\Livewire\Admin\Customers\Categories;
+use App\Livewire\Admin\Customers\Clients;
 use App\Livewire\Admin\Customers\Editor;
 use App\Livewire\Admin\Customers\Index;
 use App\Livewire\Admin\Customers\Show;
@@ -30,6 +32,8 @@ use App\Livewire\Admin\Tasks\Allocation;
 use App\Livewire\Rider\Attendance;
 use App\Livewire\Rider\Home as RiderHome;
 use App\Livewire\Rider\Notifications;
+use App\Livewire\Rider\Profile;
+use App\Livewire\Rider\Tasks\Manage;
 use App\Livewire\Rider\Tasks\SubmissionHistory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -50,6 +54,7 @@ Route::middleware('guest')->group(function (): void {
 });
 
 Route::middleware(['auth', 'auth.session'])->group(function (): void {
+    Route::get('/account/profile-photo', ProfilePhotoController::class)->middleware('throttle:120,1')->name('account.profile-photo');
     Route::get('/home', function (Request $request) {
         if ($request->user()->can('admin.access')) {
             return redirect()->route('admin.home');
@@ -121,10 +126,12 @@ Route::middleware(['auth', 'auth.session'])->group(function (): void {
         Route::livewire('/', Index::class)->name('index');
         Route::livewire('/create', Editor::class)->name('create');
         Route::livewire('/categories', Categories::class)->name('categories');
+        Route::livewire('/clients', Clients::class)->middleware('can:scopes.manage')->name('clients');
         Route::livewire('/{customer}/edit', Editor::class)->name('edit');
         Route::livewire('/{customer}', Show::class)->name('show');
     });
     Route::livewire('/rider', RiderHome::class)->middleware('can:use-rider-interface')->name('rider.home');
+    Route::livewire('/rider/profile', Profile::class)->middleware('can:use-rider-interface')->name('rider.profile');
     Route::middleware(['can:use-rider-interface', 'can:tasks.view'])->prefix('rider/assignments')->name('rider.assignments.')->group(function (): void {
         Route::livewire('/', App\Livewire\Rider\Assignments\Index::class)->name('index');
         Route::livewire('/{batch}', App\Livewire\Rider\Assignments\Show::class)->whereUuid('batch')->name('show');
@@ -133,6 +140,7 @@ Route::middleware(['auth', 'auth.session'])->group(function (): void {
     Route::livewire('/rider/attendance', Attendance::class)->middleware(['can:use-rider-interface', 'can:attendance.view_own'])->name('rider.attendance');
     Route::livewire('/attendance', Attendance::class)->middleware('can:attendance.view_own')->name('attendance.own');
     Route::middleware(['can:use-rider-interface', 'can:tasks.view'])->prefix('rider/tasks')->name('rider.tasks.')->group(function (): void {
+        Route::livewire('/manage', Manage::class)->middleware('can:tasks.submit')->name('manage');
         Route::livewire('/', App\Livewire\Rider\Tasks\Index::class)->name('index');
         Route::livewire('/history/{submission}', SubmissionHistory::class)->whereUuid('submission')->name('history');
         Route::livewire('/{task}', App\Livewire\Rider\Tasks\Show::class)->whereUuid('task')->name('show');

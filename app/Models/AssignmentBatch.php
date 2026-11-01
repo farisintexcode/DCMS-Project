@@ -34,6 +34,11 @@ class AssignmentBatch extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(Task::class);
+    }
+
     public function type(): BelongsTo
     {
         return $this->belongsTo(ReferenceValue::class, 'type_code', 'code')->where('category', 'assignment_type');
@@ -42,10 +47,5 @@ class AssignmentBatch extends Model
     public function state(): BelongsTo
     {
         return $this->belongsTo(ReferenceValue::class, 'state_code', 'code')->where('category', 'state');
-    }
-
-    public function tasks(): HasMany
-    {
-        return $this->hasMany(Task::class);
     }
 }

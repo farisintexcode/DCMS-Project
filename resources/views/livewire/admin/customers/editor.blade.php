@@ -2,7 +2,7 @@
     <x-feedback />
     <x-page-header :title="$customerId ? 'Edit customer' : 'Create customer'" eyebrow="Customer Management" description="Keep a complete, accurate record. Fields marked with * are required."><x-slot:actions><a href="{{ route('admin.customers.index') }}" class="btn btn-secondary"><x-icon name="arrow-left" class="size-4" />Back to customers</a></x-slot:actions></x-page-header>
     <nav aria-label="Customer form sections" class="surface flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-4"><a href="#customer-identity" class="flex min-h-11 items-center gap-2 text-xs font-medium"><span class="step-number">01</span>Identity</a><a href="#contact-details" class="flex min-h-11 items-center gap-2 text-xs font-medium"><span class="step-number">02</span>Contact details</a>@can('customers.categorize')<a href="#customer-categories" class="flex min-h-11 items-center gap-2 text-xs font-medium"><span class="step-number">03</span>Categories</a>@endcan</nav>
-    @if($clients->isEmpty())<p class="rounded-xl bg-amber-50 p-5 text-sm">No client portfolio access is currently granted.</p>@else
+    @if($clients->isEmpty())<p class="rounded-xl bg-amber-50 p-5 text-sm">Customers are recorded under a client. @can('scopes.manage')<a href="{{ route('admin.customers.clients') }}" class="font-semibold underline">Create a client first</a>.@else Ask an authorized administrator to grant you access to a client.@endcan</p>@else
     <form wire:submit="save" class="grid gap-6">
         <fieldset id="customer-identity" class="form-section grid scroll-mt-28 gap-5 sm:grid-cols-2">
             <legend class="px-2 font-semibold">Customer identity</legend>

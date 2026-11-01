@@ -29,6 +29,7 @@ test('Rider can start assigned work save a validated visit and review a blocked 
     await page.getByLabel('Visit remarks',{exact:true}).fill('Synthetic browser visit '+surface);
     await page.getByRole('button',{name:'Save visit & remarks',exact:true}).click();
     await expect(page.getByRole('alert')).toContainText('A due follow-up is required');
+    await page.getByRole('button',{name:'OK',exact:true}).click();
     await expect(page.getByLabel('Visit remarks',{exact:true})).toHaveValue('Synthetic browser visit '+surface);
     await page.getByLabel('Contact result',{exact:true}).selectOption('customer_contacted');
     await page.getByLabel('Visit outcome',{exact:true}).selectOption('payment_claimed');

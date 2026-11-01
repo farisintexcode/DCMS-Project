@@ -11,9 +11,11 @@ use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
 use Livewire\Component;
 
-/** Module.md M01 / Prototype.md UI05; avatar arrives with quarantined Document storage. */
+/** Module.md M01 / Prototype.md UI05; own user identity, password and private Document avatar. */
 class Settings extends Component
 {
+    use EditsProfilePhoto;
+
     public string $current_password = '';
 
     public string $password = '';
@@ -42,6 +44,6 @@ class Settings extends Component
     {
         abort_unless(Auth::user()?->isActive(), 403);
 
-        return view('livewire.account.settings')->layout(Auth::user()->can('admin.access') ? 'layouts.admin' : 'layouts.rider');
+        return view(Auth::user()->can('admin.access') ? 'livewire.account.settings' : 'livewire.rider.account-settings')->layout(Auth::user()->can('admin.access') ? 'layouts.admin' : 'layouts.rider');
     }
 }

@@ -35,17 +35,16 @@
         @endcanany
         <div class="sidebar-divider" x-show="!query.trim()"></div>
         <p class="sidebar-section sidebar-label" x-show="!query.trim()">Supporting modules</p>
-        @canany(['customers.view', 'customers.manage_categories'])
-        <x-sidebar-group label="Customer management" icon="users" :active="request()->routeIs('admin.customers.*')" keywords="Customers Customer categories">
-            @can('customers.view')<x-sidebar-item label="Customers" icon="users" parent="Customer management" :href="route('admin.customers.index')" :active="request()->routeIs('admin.customers.*') && !request()->routeIs('admin.customers.categories')" />@endcan
-            @can('customers.manage_categories')<x-sidebar-item label="Customer categories" icon="tag" parent="Customer management" :href="route('admin.customers.categories')" :active="request()->routeIs('admin.customers.categories')" />@endcan
+        @can('scopes.manage')
+        <x-sidebar-group label="Client management" icon="users" :active="request()->routeIs('admin.customers.clients')" keywords="Clients Client management Client categories">
+            <x-sidebar-item label="Clients" icon="shield" parent="Client management" :href="route('admin.customers.clients')" :active="request()->routeIs('admin.customers.clients')" />
         </x-sidebar-group>
-        @endcanany
+        @endcan
         @can('viewAny',\App\Models\CollectionActivity::class)<x-sidebar-item label="Call Centre" icon="phone" :href="route('admin.calls.index')" :active="request()->routeIs('admin.calls.*')" />@endcan
         @can('viewAny',\App\Models\CommunicationTemplate::class)<x-sidebar-item label="Communications" icon="mail" :href="route('admin.communications.index')" :active="request()->routeIs('admin.communications.*')" />@endcan
         @can('roles.manage')<x-sidebar-item label="Administration" icon="settings" planned />@endcan
     @else
-        <div class="rider-menu-profile sidebar-label"><span class="rider-avatar">{{ mb_strtoupper(mb_substr(auth()->user()->name,0,1)) }}</span><div class="min-w-0"><p class="font-semibold">{{ auth()->user()->name }}</p><p class="mt-1 break-all text-xs">{{ auth()->user()->email }}</p></div></div>
+        <div class="rider-menu-profile sidebar-label"><span class="rider-avatar"><x-profile-photo /></span><div class="min-w-0"><p class="font-semibold">{{ auth()->user()->name }}</p><p class="mt-1 break-all text-xs">{{ auth()->user()->email }}</p></div></div>
         <p class="sidebar-section sidebar-label" x-show="!query.trim()">Your workspace</p>
         <x-sidebar-item label="Home" icon="home" :href="route('rider.home')" :active="request()->routeIs('rider.home')" />
         @can('tasks.view')<x-sidebar-item label="Assignment" icon="layers" :href="route('rider.assignments.index')" :active="request()->routeIs('rider.assignments.*')" />@endcan
@@ -53,11 +52,10 @@
         @can('attendance.view_own')<x-sidebar-item label="Attendance" icon="clock" :href="route('rider.attendance')" :active="request()->routeIs('rider.attendance')" />@endcan
         <div class="sidebar-divider" x-show="!query.trim()"></div>
         <x-sidebar-item label="Notifications" icon="bell" :href="route('rider.notifications')" :active="request()->routeIs('rider.notifications')" />
-        <x-sidebar-item label="Profile & settings" icon="settings" :href="route('account.settings')" :active="request()->routeIs('account.settings')" />
         <div class="rider-menu-appearance sidebar-label"><span>Appearance</span><x-theme-toggle /></div>
     @endif
     </nav><p x-cloak x-show="query.trim() && ![...$refs.navigationItems.querySelectorAll('[data-nav-search]')].some(el => matches(el.dataset.navSearch))" class="sidebar-label px-3 py-6 text-xs leading-6 text-ink-500" role="status">No matching pages. Try another menu name.</p></div>
-    <div @class(['sidebar-footer', 'rider-side-footer' => $portal === 'rider'])>@if($portal === 'rider')<form method="POST" action="{{ route('logout') }}">@csrf<button type="submit" class="rider-logout"><x-icon name="logout" />Sign out</button></form>@endif<span class="sidebar-label text-[10px] leading-5 text-ink-500">Nexora<br>Debt Collection Management System</span>@if($portal === 'admin')<button type="button" class="sidebar-collapse grid size-11 shrink-0 place-items-center rounded-xl border border-white/20 hover:bg-white/10" :aria-label="rail ? 'Expand sidebar' : 'Collapse sidebar'" :aria-expanded="!rail" aria-controls="admin-navigation" @click="toggleCompact()"><x-icon name="panel" /></button>@endif</div>
+    <div @class(['sidebar-footer', 'rider-side-footer' => $portal === 'rider'])><span class="sidebar-label text-[10px] leading-5 text-ink-500">Nexora<br>Debt Collection Management System</span>@if($portal === 'admin')<button type="button" class="sidebar-collapse grid size-11 shrink-0 place-items-center rounded-xl border border-white/20 hover:bg-white/10" :aria-label="rail ? 'Expand sidebar' : 'Collapse sidebar'" :aria-expanded="!rail" aria-controls="admin-navigation" @click="toggleCompact()"><x-icon name="panel" /></button>@endif</div>
 </aside>
 <x-sidebar-tooltip />
 
