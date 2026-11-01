@@ -17,11 +17,10 @@
                 </button>
             </div>
             <div id="assignment-filters" class="grid gap-5 border-t border-ink-100 pt-5" x-show="filtersOpen" x-cloak>
-                <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <x-select name="filter-type" label="Assignment type" wire:model="draft.type"><option value="">All types</option>@foreach($types as $item)<option value="{{ $item->code }}">{{ $item->label }}</option>@endforeach</x-select>
                     <x-select name="filter-state" label="State" wire:model="draft.state"><option value="">All states</option>@foreach($states as $item)<option value="{{ $item->code }}">{{ $item->label }}</option>@endforeach</x-select>
-                    <x-input name="filter-from" label="Assignment date from" type="date" class="min-h-11 py-2" wire:model="draft.from" />
-                    <x-input name="filter-until" label="Assignment date until" type="date" class="min-h-11 py-2" wire:model="draft.until" />
+                    <x-date-range name="filter-date" label="Assignment Date" from="draft.from" until="draft.until" />
                 </div>
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <button type="button" class="min-h-11 text-xs font-semibold text-ink-700 underline decoration-ink-300 underline-offset-4 hover:decoration-brand-accent" wire:click="resetFilters">Clear all filters</button>

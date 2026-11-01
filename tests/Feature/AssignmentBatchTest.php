@@ -185,6 +185,20 @@ test('register applies draft filters on demand combines them with search and cou
         ->set('perPage', '10')->assertViewHas('batches', fn ($batches): bool => $batches->perPage() === 10);
 });
 
+test('register filters one assignment date or a range through the combined date field', function (): void {
+    $user = staffManager();
+    AssignmentBatch::factory()->create(['name' => 'First package', 'start_date' => '2026-10-05', 'due_date' => '2026-12-30']);
+    AssignmentBatch::factory()->create(['name' => 'Second package', 'start_date' => '2026-10-06', 'due_date' => '2026-12-30']);
+    AssignmentBatch::factory()->create(['name' => 'Third package', 'start_date' => '2026-10-20', 'due_date' => '2026-12-30']);
+
+    Livewire::actingAs($user)->test(Index::class)
+        ->assertSee('Assignment Date')->assertDontSee('Assignment date from')->assertDontSee('Assignment date until')
+        ->set('draft.from', '2026-10-05')->set('draft.until', '2026-10-05')->call('applyFilters')
+        ->assertSee('First package')->assertDontSee('Second package')->assertDontSee('Third package')
+        ->set('draft.from', '2026-10-05')->set('draft.until', '2026-10-06')->call('applyFilters')
+        ->assertSee('First package')->assertSee('Second package')->assertDontSee('Third package');
+});
+
 test('PostgreSQL enforces dates references and lookup categories', function (): void {
     $user = staffManager();
     $batch = AssignmentBatch::factory()->create();
